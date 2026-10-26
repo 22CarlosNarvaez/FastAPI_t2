@@ -13,6 +13,7 @@ class ItemPedido(BaseModel):
 
 class PedidoCreate(BaseModel):
     cliente: str = Field(min_length=1)
+    documento_cliente: str = Field(min_length=1, max_length=30)
     items: list[ItemPedido] = Field(min_length=1)
 
 
