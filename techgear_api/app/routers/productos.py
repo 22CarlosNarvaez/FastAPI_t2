@@ -1,38 +1,34 @@
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, Depends, status
 
-from app.models.producto import Producto, ProductoCreate
-from app.services import productos as servicio
+from app.core.deps import require_admin
+from app.models.producto import ProductoCreate, ProductoOut, ProductoUpdate
+from app.services import productos as svc
 
-router = APIRouter(prefix="/productos", tags=["productos"])
-
-
-@router.post("/", response_model=Producto, status_code=status.HTTP_201_CREATED)
-async def crear_producto(datos: ProductoCreate):
-    return await servicio.crear(datos)
+router = APIRouter(prefix="/productos", tags=["Productos"])
 
 
-@router.get("/", response_model=list[Producto])
-async def listar_productos():
-    return await servicio.listar()
+@router.get("", response_model=list[ProductoOut])
+def listar():
+    return svc.listar()
 
 
-@router.get("/{producto_id}", response_model=Producto)
-async def obtener_producto(producto_id: str):
-    producto = await servicio.obtener(producto_id)
-    if producto is None:
-        raise HTTPException(status_code=404, detail="Producto no encontrado")
-    return producto
+@router.get("/{producto_id}", response_model=ProductoOut)
+def obtener(producto_id: str):
+    return svc.obtener(producto_id)
 
 
-@router.put("/{producto_id}", response_model=Producto)
-async def actualizar_producto(producto_id: str, datos: ProductoCreate):
-    producto = await servicio.actualizar(producto_id, datos)
-    if producto is None:
-        raise HTTPException(status_code=404, detail="Producto no encontrado")
-    return producto
+@router.post("", response_model=ProductoOut, status_code=status.HTTP_201_CREATED,
+             dependencies=[Depends(require_admin)])
+def crear(data: ProductoCreate):
+    return svc.crear(data)
 
 
-@router.delete("/{producto_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def eliminar_producto(producto_id: str):
-    if not await servicio.eliminar(producto_id):
-        raise HTTPException(status_code=404, detail="Producto no encontrado")
+@router.put("/{producto_id}", response_model=ProductoOut, dependencies=[Depends(require_admin)])
+def actualizar(producto_id: str, data: ProductoUpdate):
+    return svc.actualizar(producto_id, data)
+
+
+@router.delete("/{producto_id}", status_code=status.HTTP_204_NO_CONTENT,
+               dependencies=[Depends(require_admin)])
+def eliminar(producto_id: str):
+    svc.eliminar(producto_id)

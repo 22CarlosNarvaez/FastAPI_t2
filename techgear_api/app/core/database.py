@@ -1,32 +1,24 @@
-from pymongo import AsyncMongoClient
-from pymongo.asynchronous.database import AsyncDatabase
+from pymongo import MongoClient
+from pymongo.database import Database
 
 from app.core.config import settings
 
-_client: AsyncMongoClient | None = None
+
+client = MongoClient(settings.mongodb_uri, serverSelectionTimeoutMS=8000)
+db: Database = client[settings.db_name]
+
+col_usuarios = db["usuarios"]
+col_productos = db["productos"]
+col_pedidos = db["pedidos"]
 
 
-def connect() -> None:
-    global _client
-    if _client is None:
-        _client = AsyncMongoClient(settings.mongodb_uri)
+def init_indexes() -> None:
+    col_usuarios.create_index("email", unique=True)
 
 
-async def disconnect() -> None:
-    global _client
-    if _client is not None:
-        client = _client
-        _client = None
-        await client.close()
+def ping() -> None:
+    client.admin.command("ping")
 
 
-def get_database() -> AsyncDatabase:
-    if _client is None:
-        raise RuntimeError("Database client is not initialized.")
-    return _client[settings.mongodb_db_name]
-
-
-async def ping() -> None:
-    if _client is None:
-        raise RuntimeError("Database client is not initialized.")
-    await _client.admin.command("ping")
+def close() -> None:
+    client.close()

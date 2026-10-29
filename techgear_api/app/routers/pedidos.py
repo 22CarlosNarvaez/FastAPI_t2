@@ -1,24 +1,32 @@
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, Depends, status
 
-from app.models.pedido import Pedido, PedidoCreate
-from app.services import pedidos as servicio
+from app.core.deps import get_current_user, require_admin
+from app.models.pedido import PagoPedido, PedidoCreate, PedidoOut
+from app.services import pedidos as svc
 
-router = APIRouter(prefix="/pedidos", tags=["pedidos"])
-
-
-@router.post("/", response_model=Pedido, status_code=status.HTTP_201_CREATED)
-async def crear_pedido(datos: PedidoCreate):
-    return await servicio.crear(datos)
+router = APIRouter(prefix="/pedidos", tags=["Pedidos"])
 
 
-@router.get("/", response_model=list[Pedido])
-async def listar_pedidos():
-    return await servicio.listar()
+@router.post("", response_model=PedidoOut, status_code=status.HTTP_201_CREATED)
+def crear(data: PedidoCreate, user: dict = Depends(get_current_user)):
+    return svc.crear(user, data)
 
 
-@router.get("/{pedido_id}", response_model=Pedido)
-async def obtener_pedido(pedido_id: str):
-    pedido = await servicio.obtener(pedido_id)
-    if pedido is None:
-        raise HTTPException(status_code=404, detail="Pedido no encontrado")
-    return pedido
+@router.get("", response_model=list[PedidoOut])
+def listar(user: dict = Depends(get_current_user)):
+    return svc.listar_para(user)
+
+
+@router.post("/{pedido_id}/pagar", response_model=PedidoOut)
+def pagar(pedido_id: str, data: PagoPedido, user: dict = Depends(get_current_user)):
+    return svc.pagar(pedido_id, user, data)
+
+
+@router.patch("/{pedido_id}/enviar", response_model=PedidoOut)
+def marcar_enviado(pedido_id: str, user: dict = Depends(require_admin)):
+    return svc.marcar_enviado(pedido_id, user)
+
+
+@router.patch("/{pedido_id}/recibir", response_model=PedidoOut)
+def marcar_recibido(pedido_id: str, user: dict = Depends(get_current_user)):
+    return svc.marcar_recibido(pedido_id, user)

@@ -2,14 +2,19 @@ from pathlib import Path
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-BASE_DIR = Path(__file__).resolve().parents[2]
+
+API_ROOT = Path(__file__).resolve().parents[2]
 
 
 class Settings(BaseSettings):
     mongodb_uri: str
-    mongodb_db_name: str = "techgear"
+    db_name: str = "techgear"
+    secret_key: str
+    algorithm: str = "HS256"
+    access_token_expire_minutes: int = 60
+    admin_registration_code: str = ""
 
-    model_config = SettingsConfigDict(env_file=BASE_DIR / ".env")
+    model_config = SettingsConfigDict(env_file=API_ROOT / ".env", extra="ignore")
 
 
 settings = Settings()

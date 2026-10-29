@@ -1,53 +1,50 @@
 from bson import ObjectId
 from bson.errors import InvalidId
+from fastapi import HTTPException, status
 
-from app.core.database import get_database
-from app.models.producto import ProductoCreate
-
-COLECCION = "productos"
+from app.core.database import col_productos
+from app.models.producto import ProductoCreate, ProductoUpdate
 
 
-def _a_objectid(producto_id: str) -> ObjectId | None:
+def to_object_id(value: str) -> ObjectId:
     try:
-        return ObjectId(producto_id)
+        return ObjectId(value)
     except (InvalidId, TypeError):
-        return None
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "ID inválido")
 
 
-async def crear(datos: ProductoCreate) -> dict:
-    coleccion = get_database()[COLECCION]
-    documento = datos.model_dump()
-    resultado = await coleccion.insert_one(documento)
-    documento["_id"] = resultado.inserted_id
-    return documento
+def to_out(doc: dict) -> dict:
+    doc = dict(doc)
+    doc["id"] = str(doc.pop("_id"))
+    return doc
 
 
-async def listar() -> list[dict]:
-    coleccion = get_database()[COLECCION]
-    return await coleccion.find().to_list(length=None)
+def listar() -> list[dict]:
+    return [to_out(p) for p in col_productos.find().sort("nombre", 1)]
 
 
-async def obtener(producto_id: str) -> dict | None:
-    oid = _a_objectid(producto_id)
-    if oid is None:
-        return None
-    return await get_database()[COLECCION].find_one({"_id": oid})
+def obtener(producto_id: str) -> dict:
+    doc = col_productos.find_one({"_id": to_object_id(producto_id)})
+    if not doc:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Producto no encontrado")
+    return to_out(doc)
 
 
-async def actualizar(producto_id: str, datos: ProductoCreate) -> dict | None:
-    oid = _a_objectid(producto_id)
-    if oid is None:
-        return None
-    return await get_database()[COLECCION].find_one_and_update(
-        {"_id": oid},
-        {"$set": datos.model_dump()},
-        return_document=True,
-    )
+def crear(data: ProductoCreate) -> dict:
+    doc = data.model_dump()
+    res = col_productos.insert_one(doc)
+    doc["_id"] = res.inserted_id
+    return to_out(doc)
 
 
-async def eliminar(producto_id: str) -> bool:
-    oid = _a_objectid(producto_id)
-    if oid is None:
-        return False
-    resultado = await get_database()[COLECCION].delete_one({"_id": oid})
-    return resultado.deleted_count == 1
+def actualizar(producto_id: str, data: ProductoUpdate) -> dict:
+    cambios = data.model_dump(exclude_unset=True)
+    if cambios:
+        col_productos.update_one({"_id": to_object_id(producto_id)}, {"$set": cambios})
+    return obtener(producto_id)
+
+
+def eliminar(producto_id: str) -> None:
+    res = col_productos.delete_one({"_id": to_object_id(producto_id)})
+    if res.deleted_count == 0:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Producto no encontrado")
