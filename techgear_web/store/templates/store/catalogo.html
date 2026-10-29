@@ -1,0 +1,50 @@
+{% extends "store/base.html" %}
+{% block title %}Tienda{% endblock %}
+{% block content %}
+<header class="catalog-hero text-center mx-auto mb-5">
+  <p class="eyebrow mb-2">Tecnología para tu día a día</p>
+  <h1 class="page-title mb-3">Encuentra tu próximo favorito.</h1>
+  <p class="text-secondary mb-0">Una selección de accesorios y dispositivos, elegidos para acompañarte.</p>
+</header>
+
+{% if error %}
+  <div class="alert alert-warning text-center mx-auto" style="max-width: 720px">{{ error }}</div>
+{% elif not productos %}
+  <div class="alert alert-light border text-center mx-auto py-4" style="max-width: 720px">Pronto encontrarás nuevos productos aquí.</div>
+{% endif %}
+
+<div class="row row-cols-1 row-cols-sm-2 row-cols-lg-3 g-4 justify-content-center">
+  {% for p in productos %}
+  <div class="col">
+    <article class="card product-card h-100 bg-white shadow-sm">
+      {% if p.imagen_url %}
+        <img src="{{ p.imagen_url }}" class="card-img-top product-image" alt="{{ p.nombre }}" loading="lazy">
+      {% else %}
+        <img src="/static/store/img/product-placeholder.svg" class="card-img-top product-image" alt="Imagen ilustrativa de {{ p.nombre }}" loading="lazy">
+      {% endif %}
+      <div class="card-body">
+        <span class="badge category-chip rounded-pill mb-3">{{ p.categoria }}</span>
+        <h2 class="h5 card-title fw-semibold mb-2">{{ p.nombre }}</h2>
+        <p class="card-text text-secondary small mb-3">{{ p.descripcion|default:"Diseñado para acompañarte todos los días." }}</p>
+        <p class="fs-4 fw-semibold mb-2">${{ p.precio|floatformat:2 }}</p>
+        <small class="text-secondary">
+          <span class="stock-dot {% if p.stock <= 0 %}out{% endif %}"></span>
+          {% if p.stock > 0 %}Disponible · {{ p.stock }} en stock{% else %}Agotado{% endif %}
+        </small>
+      </div>
+      <div class="card-footer bg-white">
+        {% if not request.session.usuario %}
+          <a href="{% url 'login' %}" class="btn btn-outline-secondary rounded-pill w-100">Inicia sesión para pedir</a>
+        {% elif request.session.usuario.rol == "cliente" and p.stock > 0 %}
+          <form method="post" action="{% url 'pedir' p.id %}" class="d-flex gap-2">
+            {% csrf_token %}
+            <input type="number" name="cantidad" value="1" min="1" max="{{ p.stock }}" aria-label="Cantidad" class="form-control rounded-pill" style="max-width:90px">
+            <button class="btn btn-ink rounded-pill flex-grow-1">Agregar pedido</button>
+          </form>
+        {% endif %}
+      </div>
+    </article>
+  </div>
+  {% endfor %}
+</div>
+{% endblock %}

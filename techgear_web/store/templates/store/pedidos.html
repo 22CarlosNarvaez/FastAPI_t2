@@ -1,0 +1,393 @@
+{% extends "store/base.html" %}
+{% block title %}Pedidos{% endblock %}
+{% block content %}
+<div class="mb-4">
+  <div class="eyebrow">Tu cuenta</div>
+  <h1 class="page-title mb-2">{% if request.session.usuario.rol == "admin" %}Gestión de pedidos{% else %}Tus pedidos{% endif %}</h1>
+  <p class="text-secondary mb-0">
+    {% if request.session.usuario.rol == "admin" %}Revisa pagos y actualiza el estado de los envíos.{% else %}Revisa tus compras, completa el pago y consulta el estado de entrega.{% endif %}
+  </p>
+</div>
+{% if error %}<div class="alert alert-warning">{{ error }}</div>{% endif %}
+
+{% if request.session.usuario.rol == "cliente" %}
+  {% if pedidos_pendientes %}
+  <form method="post" action="{% url 'pagar_pedidos' %}" id="checkout-form">
+    {% csrf_token %}
+    <section class="mb-5">
+      <div class="d-flex align-items-center justify-content-between mb-3">
+        <div>
+          <h2 class="h4 mb-1">Carrito pendiente de pago</h2>
+          <p class="text-secondary small mb-0">Selecciona los pedidos que quieres pagar ahora.</p>
+        </div>
+        <span class="badge rounded-pill text-bg-warning">{{ pedidos_pendientes|length }} pendiente{{ pedidos_pendientes|length|pluralize:"s" }}</span>
+      </div>
+
+      {% for p in pedidos_pendientes %}
+      <article class="card order-card shadow-sm mb-3">
+        <div class="card-header p-3 d-flex align-items-center justify-content-between flex-wrap gap-2">
+          <label class="form-check d-flex align-items-center gap-2 mb-0">
+            <input class="form-check-input pedido-seleccionado mt-0" type="checkbox" name="pedido_id"
+                   value="{{ p.id }}" data-total="{{ p.total }}" aria-label="Seleccionar pedido">
+            <span class="fw-semibold">Pedido #{{ p.id|slice:":8" }}</span>
+          </label>
+          <span class="small text-secondary">{{ p.fecha|slice:":10" }} <span class="badge rounded-pill text-bg-warning ms-1">Pendiente de pago</span></span>
+        </div>
+        <div class="card-body p-0">
+          {% for i in p.items %}
+          <div class="order-item px-3 py-3 d-flex align-items-center justify-content-between gap-3">
+            <div class="min-w-0">
+              <div class="fw-semibold text-truncate">{{ i.nombre }}</div>
+              <div class="small text-secondary">{{ i.cantidad }} × ${{ i.precio_unitario|floatformat:2 }}</div>
+            </div>
+            <span class="fw-semibold text-nowrap">${{ i.subtotal|floatformat:2 }}</span>
+          </div>
+          {% endfor %}
+        </div>
+        <div class="card-footer border-0 p-3">
+          <div class="order-summary px-3 py-2 d-flex justify-content-between align-items-center">
+            <span class="text-secondary">Total del pedido</span>
+            <strong class="fs-5">${{ p.total|floatformat:2 }}</strong>
+          </div>
+        </div>
+      </article>
+      {% endfor %}
+
+      <div class="d-flex justify-content-end">
+        <button class="btn btn-success btn-lg rounded-pill px-4" id="abrir-pago" type="button" disabled>
+          Continuar al pago
+        </button>
+      </div>
+
+      <section class="card order-card shadow-sm mt-4" id="checkout" hidden>
+        <div class="card-body p-4">
+          <div class="d-flex justify-content-between align-items-start flex-wrap gap-3 border-bottom pb-3 mb-4">
+            <div>
+              <div class="eyebrow">Resumen de compra</div>
+              <h2 class="h4 mb-0">Finalizar pedido</h2>
+            </div>
+            <div class="text-end">
+              <div class="small text-secondary"><span id="cantidad-seleccionada">0</span> pedido(s) seleccionado(s)</div>
+              <strong class="fs-3" id="total-seleccionado">$0.00</strong>
+            </div>
+          </div>
+
+          <h3 class="h5 mb-3">Dirección de entrega</h3>
+          <div class="row g-3 mb-4">
+            <div class="col-12">
+              <label class="form-label" for="direccion">Dirección completa</label>
+              <input class="form-control" id="direccion" name="direccion" type="text"
+                     minlength="5" maxlength="180" placeholder="Calle, carrera, número y apartamento" required>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label" for="telefono">Teléfono celular</label>
+              <input class="form-control" id="telefono" name="telefono" type="tel"
+                     pattern="\+?[0-9][0-9\s-]{6,15}" placeholder="300 123 4567" required>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label" for="codigo-postal">Código postal</label>
+              <input class="form-control" id="codigo-postal" name="codigo_postal" type="text"
+                     inputmode="numeric" pattern="[0-9]{6}" maxlength="6" placeholder="050001" required>
+              <div class="form-text">Escribe los 6 dígitos de tu código postal.</div>
+            </div>
+          </div>
+
+          <h3 class="h5 mb-3">Método de pago</h3>
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label class="form-label" for="metodo-pago">Elige cómo pagar</label>
+              <select class="form-select" id="metodo-pago" name="metodo_pago" required>
+                <option value="" selected disabled>Selecciona un método</option>
+                <option value="tarjeta">Tarjeta</option>
+                <option value="nequi">Nequi</option>
+                <option value="transferencia">Transferencia bancaria</option>
+              </select>
+            </div>
+            <div class="col-12" id="datos-tarjeta" hidden>
+              <div class="row g-3">
+                <div class="col-md-6">
+                  <label class="form-label" for="tarjeta-nombre">Titular de prueba</label>
+                  <input class="form-control dato-prueba" id="tarjeta-nombre" type="text"
+                         value="CLIENTE DE PRUEBA" autocomplete="off" data-demo-value="CLIENTE DE PRUEBA">
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label" for="tarjeta-numero">Número de tarjeta de prueba</label>
+                  <input class="form-control dato-prueba" id="tarjeta-numero" type="text"
+                         inputmode="numeric" value="4111 1111 1111 1111" autocomplete="off"
+                         data-demo-value="4111111111111111">
+                </div>
+                <div class="col-md-3">
+                  <label class="form-label" for="tarjeta-vencimiento">Vencimiento de prueba</label>
+                  <input class="form-control dato-prueba" id="tarjeta-vencimiento" type="text"
+                         value="12/30" autocomplete="off" data-demo-value="12/30">
+                </div>
+                <div class="col-md-3">
+                  <label class="form-label" for="tarjeta-cvv">CVV de prueba</label>
+                  <input class="form-control dato-prueba" id="tarjeta-cvv" type="password"
+                         inputmode="numeric" value="123" autocomplete="new-password" data-demo-value="123">
+                </div>
+              </div>
+            </div>
+            <div class="col-12" id="datos-nequi" hidden>
+              <div class="row g-3">
+                <div class="col-md-6">
+                  <label class="form-label" for="nequi-numero">Número Nequi de prueba</label>
+                  <input class="form-control dato-prueba" id="nequi-numero" type="tel"
+                         inputmode="numeric" value="3001234567" autocomplete="off" data-demo-value="3001234567">
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label" for="nequi-clave">Clave dinámica de prueba</label>
+                  <input class="form-control dato-prueba" id="nequi-clave" type="password"
+                         inputmode="numeric" value="123456" autocomplete="new-password" data-demo-value="123456">
+                </div>
+              </div>
+            </div>
+            <div class="col-12" id="datos-transferencia" hidden>
+              <label class="form-label" for="transferencia-referencia">Referencia de transferencia de prueba</label>
+              <input class="form-control dato-prueba" id="transferencia-referencia" type="text"
+                     value="DEMO-BANK" autocomplete="off" data-demo-value="DEMO-BANK">
+            </div>
+          </div>
+
+          <div class="alert alert-info mt-4 mb-3">
+            Pago de demostración: los campos financieros usan datos ficticios. No se envían ni guardan datos de tarjeta o Nequi y no se realiza un cobro real.
+          </div>
+          <input type="hidden" name="referencia_prueba" id="referencia-prueba" value="">
+          <button class="btn btn-success btn-lg w-100 rounded-pill" id="pagar-seleccionados" type="submit" disabled>
+            Confirmar pago de prueba
+          </button>
+        </div>
+      </section>
+    </section>
+  </form>
+  {% else %}
+    <div class="alert alert-light border rounded-4 mb-5">No tienes pedidos pendientes de pago.</div>
+  {% endif %}
+
+  {% if pedidos_por_enviar or pedidos_enviados %}
+  <section class="mt-5">
+    <div class="mb-3">
+      <div class="eyebrow">Seguimiento</div>
+      <h2 class="h3 mb-0">Pedidos pagados</h2>
+    </div>
+
+    {% if pedidos_por_enviar %}
+    <h3 class="h5 mt-4 mb-3">Pendientes por enviar</h3>
+    {% for p in pedidos_por_enviar %}
+    <article class="card order-card shadow-sm mb-3">
+      <div class="card-header p-3 d-flex justify-content-between flex-wrap gap-2">
+        <strong>Pedido #{{ p.id|slice:":8" }}</strong>
+        <span class="badge rounded-pill text-bg-info">Preparando envío</span>
+      </div>
+      <div class="card-body p-3">
+        {% for i in p.items %}
+        <div class="order-item py-2 d-flex justify-content-between">
+          <span>{{ i.nombre }} <span class="text-secondary">× {{ i.cantidad }}</span></span>
+          <strong>${{ i.subtotal|floatformat:2 }}</strong>
+        </div>
+        {% endfor %}
+        <div class="small text-secondary mt-3">
+          <div><strong>Entrega:</strong> {{ p.direccion_envio }}</div>
+          <div><strong>Celular:</strong> {{ p.telefono_envio }} · <strong>Código postal:</strong> {{ p.codigo_postal }}</div>
+        </div>
+      </div>
+      <div class="card-footer bg-white d-flex justify-content-between align-items-center gap-2">
+        <span>Total pagado · {{ p.metodo_pago|title }} · ${{ p.total|floatformat:2 }}</span>
+        <form method="post" action="{% url 'marcar_pedido_recibido' p.id %}">
+          {% csrf_token %}
+          <button class="btn btn-outline-success btn-sm rounded-pill px-3 text-nowrap" type="submit"
+                  onclick="return confirm('¿Confirmas que recibiste este pedido?');">
+            Marcar recibido
+          </button>
+        </form>
+      </div>
+    </article>
+    {% endfor %}
+    {% endif %}
+
+    {% if pedidos_enviados %}
+    <h3 class="h5 mt-4 mb-3">Enviados</h3>
+    {% for p in pedidos_enviados %}
+    <article class="card order-card shadow-sm mb-3">
+      <div class="card-header p-3 d-flex justify-content-between flex-wrap gap-2">
+        <strong>Pedido #{{ p.id|slice:":8" }}</strong>
+        <span class="badge rounded-pill text-bg-success">Enviado</span>
+      </div>
+      <div class="card-body p-3">
+        {% for i in p.items %}
+        <div class="order-item py-2 d-flex justify-content-between">
+          <span>{{ i.nombre }} <span class="text-secondary">× {{ i.cantidad }}</span></span>
+          <strong>${{ i.subtotal|floatformat:2 }}</strong>
+        </div>
+        {% endfor %}
+        <div class="small text-secondary mt-3">
+          <div><strong>Entrega:</strong> {{ p.direccion_envio }}</div>
+          <div><strong>Celular:</strong> {{ p.telefono_envio }} · <strong>Código postal:</strong> {{ p.codigo_postal }}</div>
+        </div>
+      </div>
+      <div class="card-footer bg-white d-flex justify-content-between align-items-center gap-2">
+        <span>Total · {{ p.metodo_pago|title }} · ${{ p.total|floatformat:2 }}</span>
+        <form method="post" action="{% url 'marcar_pedido_recibido' p.id %}">
+          {% csrf_token %}
+          <button class="btn btn-outline-success btn-sm rounded-pill px-3 text-nowrap" type="submit"
+                  onclick="return confirm('¿Confirmas que recibiste este pedido?');">
+            Marcar recibido
+          </button>
+        </form>
+      </div>
+    </article>
+    {% endfor %}
+    {% endif %}
+  </section>
+  {% endif %}
+
+{% else %}
+  {% if pedidos_pendientes %}
+  <section class="mb-5">
+    <h2 class="h4 mb-3">Pendientes de pago</h2>
+    {% for p in pedidos_pendientes %}
+    <article class="card order-card shadow-sm mb-3">
+      <div class="card-header p-3 d-flex justify-content-between flex-wrap gap-2">
+        <strong>Pedido #{{ p.id|slice:":8" }} · {{ p.usuario_email }}</strong>
+        <span class="badge rounded-pill text-bg-warning">Pendiente de pago</span>
+      </div>
+      <div class="card-body p-3">
+        {% for i in p.items %}<div class="order-item py-2 d-flex justify-content-between"><span>{{ i.nombre }} × {{ i.cantidad }}</span><strong>${{ i.subtotal|floatformat:2 }}</strong></div>{% endfor %}
+      </div>
+      <div class="card-footer bg-white text-end fw-bold">Total: ${{ p.total|floatformat:2 }}</div>
+    </article>
+    {% endfor %}
+  </section>
+  {% endif %}
+
+  {% if pedidos_por_enviar %}
+  <section class="mb-5">
+    <h2 class="h4 mb-3">Pendientes por enviar</h2>
+    {% for p in pedidos_por_enviar %}
+    <article class="card order-card shadow-sm mb-3">
+      <div class="card-header p-3 d-flex justify-content-between flex-wrap gap-2">
+        <strong>Pedido #{{ p.id|slice:":8" }} · {{ p.usuario_email }}</strong>
+        <span class="badge rounded-pill text-bg-info">Preparando envío</span>
+      </div>
+      <div class="card-body p-3">
+        {% for i in p.items %}<div class="order-item py-2 d-flex justify-content-between"><span>{{ i.nombre }} × {{ i.cantidad }}</span><strong>${{ i.subtotal|floatformat:2 }}</strong></div>{% endfor %}
+        <div class="small text-secondary mt-3"><strong>Dirección:</strong> {{ p.direccion_envio }} · <strong>Celular:</strong> {{ p.telefono_envio }} · <strong>C.P.:</strong> {{ p.codigo_postal }}</div>
+      </div>
+      <div class="card-footer bg-white d-flex justify-content-between align-items-center">
+        <span>Total: <strong>${{ p.total|floatformat:2 }}</strong></span>
+        <form method="post" action="{% url 'marcar_pedido_enviado' p.id %}">
+          {% csrf_token %}<button class="btn btn-success btn-sm rounded-pill px-3" type="submit">Marcar como enviado</button>
+        </form>
+      </div>
+    </article>
+    {% endfor %}
+  </section>
+  {% endif %}
+
+  {% if pedidos_enviados %}
+  <section class="mb-5">
+    <h2 class="h4 mb-3">Enviados</h2>
+    {% for p in pedidos_enviados %}
+    <article class="card order-card shadow-sm mb-3">
+      <div class="card-header p-3 d-flex justify-content-between flex-wrap gap-2">
+        <strong>Pedido #{{ p.id|slice:":8" }} · {{ p.usuario_email }}</strong>
+        <span class="badge rounded-pill text-bg-success">Enviado</span>
+      </div>
+      <div class="card-body p-3">
+        {% for i in p.items %}<div class="order-item py-2 d-flex justify-content-between"><span>{{ i.nombre }} × {{ i.cantidad }}</span><strong>${{ i.subtotal|floatformat:2 }}</strong></div>{% endfor %}
+        <div class="small text-secondary mt-3"><strong>Dirección:</strong> {{ p.direccion_envio }} · <strong>Celular:</strong> {{ p.telefono_envio }} · <strong>C.P.:</strong> {{ p.codigo_postal }}</div>
+      </div>
+      <div class="card-footer bg-white text-end fw-bold">Total: ${{ p.total|floatformat:2 }}</div>
+    </article>
+    {% endfor %}
+  </section>
+  {% endif %}
+
+  {% if not pedidos %}
+  <div class="alert alert-light border rounded-4">Todavía no hay pedidos.</div>
+  {% endif %}
+{% endif %}
+
+{% if request.session.usuario.rol == "cliente" %}
+<script>
+  (() => {
+    const form = document.getElementById("checkout-form");
+    if (!form) return;
+
+    const pedidos = [...form.querySelectorAll(".pedido-seleccionado")];
+    const abrirPago = document.getElementById("abrir-pago");
+    const checkout = document.getElementById("checkout");
+    const total = document.getElementById("total-seleccionado");
+    const cantidad = document.getElementById("cantidad-seleccionada");
+    const botonConfirmar = document.getElementById("pagar-seleccionados");
+    const metodo = document.getElementById("metodo-pago");
+    const referencia = document.getElementById("referencia-prueba");
+    const formulariosMetodo = {
+      tarjeta: document.getElementById("datos-tarjeta"),
+      nequi: document.getElementById("datos-nequi"),
+      transferencia: document.getElementById("datos-transferencia")
+    };
+
+    function actualizarResumen() {
+      const seleccionados = pedidos.filter((pedido) => pedido.checked);
+      const suma = seleccionados.reduce(
+        (acumulado, pedido) => acumulado + Number(pedido.dataset.total),
+        0
+      );
+      cantidad.textContent = seleccionados.length;
+      total.textContent = `$${suma.toLocaleString("es-CO", {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+      })}`;
+      abrirPago.disabled = seleccionados.length === 0;
+      botonConfirmar.disabled = seleccionados.length === 0;
+      if (seleccionados.length === 0) checkout.hidden = true;
+    }
+
+    function actualizarMetodo() {
+      Object.entries(formulariosMetodo).forEach(([nombre, panel]) => {
+        const seleccionado = nombre === metodo.value;
+        panel.hidden = !seleccionado;
+        panel.querySelectorAll(".dato-prueba").forEach((campo) => {
+          campo.disabled = !seleccionado;
+        });
+      });
+    }
+
+    pedidos.forEach((pedido) => pedido.addEventListener("change", actualizarResumen));
+    abrirPago.addEventListener("click", () => {
+      checkout.hidden = false;
+      checkout.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+    metodo.addEventListener("change", actualizarMetodo);
+    form.addEventListener("submit", (event) => {
+      if (!metodo.value) {
+        event.preventDefault();
+        window.alert("Selecciona un método de pago.");
+        return;
+      }
+
+      const panel = formulariosMetodo[metodo.value];
+      const datosValidos = [...panel.querySelectorAll(".dato-prueba")].every((campo) => {
+        const recibido = campo.id === "tarjeta-numero"
+          ? campo.value.replaceAll(" ", "")
+          : campo.value;
+        return recibido === campo.dataset.demoValue;
+      });
+      if (!datosValidos) {
+        event.preventDefault();
+        window.alert("Para esta demostración, utiliza los datos ficticios de prueba mostrados.");
+        return;
+      }
+
+      referencia.value = `DEMO-${metodo.value.toUpperCase()}`;
+      if (!window.confirm("Se registrará un pago de demostración; no habrá un cobro real. ¿Continuar?")) {
+        event.preventDefault();
+      }
+    });
+    actualizarMetodo();
+    actualizarResumen();
+  })();
+</script>
+{% endif %}
+{% endblock %}

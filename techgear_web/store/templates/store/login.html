@@ -1,0 +1,21 @@
+{% extends "store/base.html" %}
+{% block title %}Ingresar{% endblock %}
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-md-6 col-lg-5">
+    <div class="card auth-card shadow-sm mx-auto"><div class="card-body">
+      <p class="eyebrow">Qué bueno verte</p>
+      <h1 class="h2 mb-4">Iniciar sesión</h1>
+      <form method="post">
+        {% csrf_token %}
+        <div class="mb-3"><label class="form-label">Correo</label>
+          <input type="email" name="email" class="form-control" required></div>
+        <div class="mb-3"><label class="form-label">Contraseña</label>
+          <input type="password" name="password" class="form-control" required></div>
+        <button class="btn btn-dark w-100">Ingresar</button>
+      </form>
+      <p class="mt-3 mb-0 text-center">¿No tienes cuenta? <a href="{% url 'registro' %}">Regístrate</a></p>
+    </div></div>
+  </div>
+</div>
+{% endblock %}
