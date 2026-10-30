@@ -12,26 +12,38 @@ https://docs.djangoproject.com/en/6.1/ref/settings/
 import os
 from pathlib import Path
 
+from django.core.exceptions import ImproperlyConfigured
+
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 
-# Quick-start development settings - unsuitable for production
-# See https://docs.djangoproject.com/en/6.1/howto/deployment/checklist/
+DEBUG = os.getenv("DJANGO_DEBUG", "false").lower() in {"1", "true", "yes"}
 
-# SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-9ioa@twt$^t*q^pw72)99uadc8h37a&yp3n)%uz(-sbryl!d3y'
-
-# SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = False
-
-ALLOWED_HOSTS = [
-    "fastapi-t2.onrender.com",
-    "localhost",
-    "127.0.0.1",
-]
+SECRET_KEY = os.getenv("DJANGO_SECRET_KEY")
+if not SECRET_KEY:
+    if os.getenv("RENDER_EXTERNAL_HOSTNAME"):
+        raise ImproperlyConfigured("DJANGO_SECRET_KEY must be configured on Render.")
+    SECRET_KEY = "local-development-key-not-for-production"
 
 
+def _csv_env(name: str) -> list[str]:
+    return [item.strip() for item in os.getenv(name, "").split(",") if item.strip()]
+
+
+RENDER_HOSTNAME = os.getenv("RENDER_EXTERNAL_HOSTNAME")
+
+ALLOWED_HOSTS = ["localhost", "127.0.0.1", "[::1]", ".onrender.com"]
+if RENDER_HOSTNAME:
+    ALLOWED_HOSTS.append(RENDER_HOSTNAME)
+ALLOWED_HOSTS.extend(_csv_env("DJANGO_ALLOWED_HOSTS"))
+ALLOWED_HOSTS = list(dict.fromkeys(ALLOWED_HOSTS))  # remove duplicates
+
+CSRF_TRUSTED_ORIGINS = ["https://*.onrender.com"]
+if RENDER_HOSTNAME:
+    CSRF_TRUSTED_ORIGINS.append(f"https://{RENDER_HOSTNAME}")
+CSRF_TRUSTED_ORIGINS.extend(_csv_env("DJANGO_CSRF_TRUSTED_ORIGINS"))
+CSRF_TRUSTED_ORIGINS = list(dict.fromkeys(CSRF_TRUSTED_ORIGINS))
 
 
 # Application definition
@@ -47,6 +59,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -121,7 +134,16 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/6.1/howto/static-files/
 
-STATIC_URL = 'static/'
+STATIC_URL = '/static/'
+STATIC_ROOT = BASE_DIR / 'staticfiles'
+STORAGES = {
+    "default": {
+        "BACKEND": "django.core.files.storage.FileSystemStorage",
+    },
+    "staticfiles": {
+        "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
+    },
+}
 
 
 # Email
@@ -136,11 +158,20 @@ MAILERS = {
 
 INSTALLED_APPS += ["store"]
 
-API_URL = os.getenv("API_URL", "http://127.0.0.1:8000")
+API_URL = os.getenv("API_URL") or f"http://127.0.0.1:{os.getenv('PORT', '8000')}"
 
-# JWT en sesión sin base de datos (necesario en Vercel, donde sqlite no sirve)
+# JWT is stored in a signed cookie so sessions do not depend on ephemeral disk.
 SESSION_ENGINE = "django.contrib.sessions.backends.signed_cookies"
 SESSION_COOKIE_AGE = 60 * 60
+SESSION_COOKIE_SECURE = not DEBUG
+CSRF_COOKIE_SECURE = not DEBUG
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 
-ALLOWED_HOSTS = ["127.0.0.1", "localhost", ".vercel.app"]
-CSRF_TRUSTED_ORIGINS = ["https://*.vercel.app"]
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "handlers": {"console": {"class": "logging.StreamHandler"}},
+    "loggers": {
+        "django": {"handlers": ["console"], "level": "WARNING"},
+    },
+}

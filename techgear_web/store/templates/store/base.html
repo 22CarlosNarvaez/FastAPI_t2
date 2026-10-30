@@ -52,7 +52,10 @@
           </svg>
           Ver pedidos
         </a>
-        <a class="btn btn-outline-secondary btn-sm rounded-pill px-3" href="{% url 'logout' %}">Salir</a>
+        <form method="post" action="{% url 'logout' %}">
+          {% csrf_token %}
+          <button class="btn btn-outline-secondary btn-sm rounded-pill px-3" type="submit">Salir</button>
+        </form>
       {% else %}
         <a class="btn btn-outline-secondary btn-sm rounded-pill px-3" href="{% url 'login' %}">Ingresar</a>
         <a class="btn btn-lime btn-sm rounded-pill px-3" href="{% url 'registro' %}">Crear cuenta</a>

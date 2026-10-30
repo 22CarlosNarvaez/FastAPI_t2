@@ -10,3 +10,5 @@ Django
 requests
 whitenoise
 whitenoise==6.12.0
+django
+whitenoise

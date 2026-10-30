@@ -2,7 +2,7 @@ import re
 
 from django.contrib import messages
 from django.shortcuts import redirect, render
-from django.views.decorators.http import require_POST
+from django.views.decorators.http import require_http_methods, require_POST
 
 from . import api_client
 from .api_client import APIError
@@ -24,6 +24,7 @@ def catalogo(request):
     return render(request, "store/catalogo.html", {"productos": productos, "error": error})
 
 
+@require_http_methods(["GET", "POST"])
 def login_view(request):
     if request.method == "POST":
         try:
@@ -38,6 +39,7 @@ def login_view(request):
     return render(request, "store/login.html")
 
 
+@require_http_methods(["GET", "POST"])
 def registro_view(request):
     if request.method == "POST":
         payload = {
@@ -57,6 +59,7 @@ def registro_view(request):
     return render(request, "store/registro.html")
 
 
+@require_POST
 def logout_view(request):
     request.session.flush()
     messages.info(request, "Sesión cerrada.")
@@ -246,6 +249,8 @@ def eliminar_producto(request, producto_id):
     try:
         api_client.eliminar_producto(request.session["token"], producto_id)
     except APIError as e:
+        if e.status == 401:
+            return _sesion_expirada(request)
         messages.error(request, str(e))
     else:
         messages.success(request, "Producto eliminado.")

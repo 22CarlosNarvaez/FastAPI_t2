@@ -7,8 +7,16 @@ from pathlib import Path
 
 def main():
     """Run administrative tasks."""
-    sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-    os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'techgear_web.settings')
+    web_root = Path(__file__).resolve().parent  # .../techgear_web
+    project_root = web_root.parent  # .../FastAPI_T2
+
+    # project_root -> resolves "techgear_web.settings"
+    # web_root     -> resolves the "store" app
+    for import_root in (project_root, web_root):
+        if str(import_root) not in sys.path:
+            sys.path.insert(0, str(import_root))
+
+    os.environ.setdefault("DJANGO_SETTINGS_MODULE", "techgear_web.settings")
     try:
         from django.core.management import execute_from_command_line
     except ImportError as exc:
@@ -20,5 +28,5 @@ def main():
     execute_from_command_line(sys.argv)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
