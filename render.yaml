@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: fastapi-t2
+    runtime: python
+    plan: free
+    buildCommand: pip install -r techgear_api/requirements.txt && python techgear_web/manage.py collectstatic --noinput
+    startCommand: cd techgear_api && uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    envVars:
+      - key: MONGODB_URI
+        sync: false
+      - key: SECRET_KEY
+        sync: false
+      - key: DJANGO_SECRET_KEY
+        sync: false
+      - key: ADMIN_REGISTRATION_CODE
+        sync: false

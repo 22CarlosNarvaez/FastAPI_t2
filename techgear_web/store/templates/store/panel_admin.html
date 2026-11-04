@@ -1,0 +1,46 @@
+{% extends "store/base.html" %}
+{% block title %}Panel Admin{% endblock %}
+{% block content %}
+<div class="mb-4">
+  <div class="eyebrow">TechGear · Gestión</div>
+  <h1 class="page-title mb-2">Panel de administración</h1>
+  <p class="text-secondary mb-0">Publica productos y administra el inventario de la tienda.</p>
+</div>
+
+<div class="card shadow-sm mb-4"><div class="card-body p-4">
+  <h2 class="h4 mb-3">Publicar producto</h2>
+  <form method="post" class="row g-2">
+    {% csrf_token %}
+    <div class="col-md-4"><input name="nombre" class="form-control" placeholder="Nombre" required></div>
+    <div class="col-md-2"><input name="precio" type="number" step="0.01" min="0.01" class="form-control" placeholder="Precio" required></div>
+    <div class="col-md-2"><input name="stock" type="number" min="0" class="form-control" placeholder="Stock" required></div>
+    <div class="col-md-4"><input name="categoria" class="form-control" placeholder="Categoría"></div>
+    <div class="col-md-6"><input name="imagen_url" class="form-control" placeholder="URL de imagen (opcional)"></div>
+    <div class="col-md-6"><input name="descripcion" class="form-control" placeholder="Descripción"></div>
+    <div class="col-12"><button class="btn btn-dark">Publicar</button></div>
+  </form>
+</div></div>
+
+{% if error %}<div class="alert alert-warning">{{ error }}</div>{% endif %}
+<h2 class="h4 mb-3">Inventario</h2>
+<div class="admin-table-wrap shadow-sm">
+  <table class="table table-striped">
+    <thead><tr><th>Nombre</th><th>Categoría</th><th>Precio</th><th>Stock</th><th></th></tr></thead>
+    <tbody>
+      {% for p in productos %}
+      <tr>
+        <td>{{ p.nombre }}</td><td>{{ p.categoria }}</td>
+        <td>${{ p.precio|floatformat:2 }}</td><td>{{ p.stock }}</td>
+        <td class="text-end">
+          <form method="post" action="{% url 'eliminar_producto' p.id %}" onsubmit="return confirm('¿Eliminar?')">
+            {% csrf_token %}<button class="btn btn-sm btn-outline-danger">Eliminar</button>
+          </form>
+        </td>
+      </tr>
+      {% empty %}
+      <tr><td class="text-secondary py-4" colspan="5">Todavía no hay productos publicados.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}
