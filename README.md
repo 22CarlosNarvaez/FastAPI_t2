@@ -143,6 +143,11 @@ tienda web que consume esa API.
 La documentación interactiva está disponible en `/docs`; el esquema OpenAPI
 está en `/openapi.json`.
 
+### Screenshots
+
+<img width="1366" height="736" alt="Captura desde 2026-11-03 20-16-03" src="https://github.com/user-attachments/assets/31d69e93-2002-4515-a767-740f9204c245" />
+<img width="1366" height="736" alt="Captura desde 2026-11-03 20-19-17" src="https://github.com/user-attachments/assets/d6129f1a-0922-4f98-899b-9a18b6bdf7b2" />
+
 ### Tienda Django
 
 | Ruta | Uso |
