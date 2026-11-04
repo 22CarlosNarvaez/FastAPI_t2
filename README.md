@@ -67,7 +67,7 @@ tienda web que consume esa API.
 - Una instancia accesible de MongoDB, por ejemplo MongoDB Atlas.
 - `pip` para instalar las dependencias.
 
-## 🚀 Ejecución local
+### 🚀 Ejecución local
 
 1. Clona el repositorio y entra en su directorio:
 
