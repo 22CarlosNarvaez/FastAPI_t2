@@ -46,7 +46,7 @@
         <span class="theme-toggle-label">Oscuro</span>
       </button>
       {% if request.session.usuario %}
-        <span class="text-secondary small d-none d-md-inline">{{"Hola, " | add: request.session.usuario.nombre }}</span>
+        <span class="text-secondary small d-none d-md-inline">{{request.session.usuario.nombre }}</span>
         <a class="btn btn-ink btn-sm rounded-pill px-3" href="{% url 'pedidos' %}">
           <svg class="me-1" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
             <path d="M4 5h16v15H4zM8 3v4m8-4v4M4 10h16m-11 4h6m-6 3h4"/>
