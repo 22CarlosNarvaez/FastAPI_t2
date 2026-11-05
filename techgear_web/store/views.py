@@ -13,6 +13,24 @@ from .decorators import admin_required, login_required
 FASTAPI_URL = settings.API_URL
 
 
+def _agregar_especificaciones_genericas(producto):
+    descripcion = f"{producto.get('nombre', '')} {producto.get('categoria', '')}".casefold()
+    if "teclad" in descripcion:
+        producto["especificaciones"] = [
+            "Conexión USB compatible con equipos estándar",
+            "Distribución de teclas en español",
+            "Diseño cómodo para uso diario",
+        ]
+    elif "lenovo" in descripcion:
+        producto["especificaciones"] = [
+            "Pantalla de 15,6 pulgadas Full HD",
+            "Procesador Intel Core i5",
+            "8 GB de memoria RAM y unidad SSD de 512 GB",
+            "Características genéricas; pueden variar según el modelo exacto.",
+        ]
+    return producto
+
+
 def _sesion_expirada(request):
     request.session.flush()
     messages.warning(request, "Tu sesión expiró. Inicia sesión de nuevo.")
@@ -22,7 +40,10 @@ def _sesion_expirada(request):
 def catalogo(request):
     productos, error = [], None
     try:
-        productos = api_client.listar_productos()
+        productos = [
+            _agregar_especificaciones_genericas(producto)
+            for producto in api_client.listar_productos()
+        ]
     except APIError as e:
         error = str(e)
     return render(request, "store/catalogo.html", {"productos": productos, "error": error})
@@ -95,6 +116,9 @@ def pedidos(request):
     lista, error = [], None
     try:
         lista = api_client.listar_pedidos(request.session["token"])
+        for pedido in lista:
+            for item in pedido.get("items", []):
+                _agregar_especificaciones_genericas(item)
     except APIError as e:
         if e.status == 401:
             return _sesion_expirada(request)

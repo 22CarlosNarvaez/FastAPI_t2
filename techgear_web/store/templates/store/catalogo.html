@@ -27,6 +27,14 @@
         <span class="badge category-chip rounded-pill mb-3">{{ p.categoria }}</span>
         <h2 class="h5 card-title fw-semibold mb-2">{{ p.nombre }}</h2>
         <p class="card-text text-secondary small mb-3">{{ p.descripcion|default:"Diseñado para acompañarte todos los días." }}</p>
+        {% if p.especificaciones %}
+          <div class="small mb-3">
+            <div class="fw-semibold mb-1">Especificaciones generales</div>
+            <ul class="text-secondary ps-3 mb-0">
+              {% for especificacion in p.especificaciones %}<li>{{ especificacion }}</li>{% endfor %}
+            </ul>
+          </div>
+        {% endif %}
         <p class="fs-4 fw-semibold mb-2">${{ p.precio|floatformat:2 }}</p>
         <small class="text-secondary">
           <span class="stock-dot {% if p.stock <= 0 %}out{% endif %}"></span>
