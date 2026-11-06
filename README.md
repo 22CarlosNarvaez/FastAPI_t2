@@ -44,28 +44,33 @@ Los precios se presentan en pesos colombianos (COP).
 - Portada informativa con descripción de TechGear y enlaces de contacto de demostración.
 - Catálogo en una ruta independiente (`/catalogo/`) con búsqueda por nombre, categoría y descripción.
 - Catálogo de productos con imágenes, categoría, descripción y especificaciones.
-- Registro e inicio de sesión para clientes y administradores.
-- Creación de pedidos desde el catálogo.
-- Validación de stock al crear el pedido; las existencias se descuentan en la API
-  y no se permite pedir más unidades de las disponibles.
-- Controles de pedido deshabilitados cuando el producto está agotado.
-- Seguimiento de pedidos pendientes, pagados, por enviar y enviados.
+- Registro e inicio de sesión para clientes; el administrador usa una cuenta fija y no requiere registro.
+- Carrito acumulable asociado a la sesión del navegador y disponible al navegar entre secciones mientras la sesión siga activa.
+- Validación de stock al agregar productos y al procesar el pago.
+- Controles para pedir deshabilitados cuando el stock llega a cero.
+- El stock no se descuenta al agregar productos ni al crear un pedido pendiente; se descuenta al confirmar el pago.
+- Seguimiento de pedidos por estado, desde pendientes de pago hasta enviados o recibidos.
 - Precios y totales con formato de pesos colombianos y separador de miles.
+- Enlace a la documentación interactiva de la API configurada para la tienda.
+- Interfaz adaptable con modo claro y oscuro.
 
 ### 🧑‍💼 Administración
 
 - Publicar y eliminar productos desde el panel de tienda.
-- Consultar pedidos agrupados por estado.
+- Consultar pedidos agrupados por estado, incluidos los pendientes de pago, los que esperan envío y los enviados.
 - Marcar pedidos pagados como enviados.
-- Crear una cuenta con rol de administrador usando el código de registro
-  configurado en el servidor.
+- Acceder sin crear una cuenta de administrador.
+para el acceso solicitado; no son apropiadas para un despliegue público. Antes
+de exponer la aplicación en producción, reemplaza este mecanismo por
+credenciales seguras y configurables.
 
 ### 💳 Pagos de demostración
 
 - Selección de tarjeta, Nequi o transferencia.
-- El formulario utiliza valores ficticios y confirma que no se realizará un
-  cobro real.
-- El estado de envío se actualiza después de registrar el pago simulado.
+- Captura de dirección, teléfono y código postal de seis dígitos para la entrega.
+- El formulario utiliza valores ficticios: no se realiza un cobro real ni se
+  envían o almacenan datos financieros.
+- El pedido pasa a preparación de envío después de confirmar el pago simulado.
 
 ## 🧰 Tecnologías
 
@@ -112,12 +117,12 @@ flowchart LR
 │   ├── store/
 │   │   ├── migrations/           # Migraciones Django
 │   │   ├── static/store/         # CSS e imágenes de la tienda
-│   │   ├── templates/store/      # Catálogo, acceso, pedidos y administración
+│   │   ├── templates/store/      # Portada, catálogo, acceso, pedidos y panel
 │   │   ├── templatetags/         # Formato de moneda COP
 │   │   ├── api_client.py         # Cliente HTTP para FastAPI
-│   │   ├── tests.py              # Pruebas de rutas, catálogo y cliente API
+│   │   ├── tests.py              # Pruebas de rutas, catálogo, moneda y API
 │   │   ├── urls.py               # Rutas web
-│   │   └── views.py              # Vistas de la tienda
+│   │   └── views.py              # Catálogo, sesión, carrito, pagos y panel
 │   ├── manage.py                 # Comandos de Django
 │   ├── settings.py               # Configuración Django
 │   └── requirements.txt          # Dependencias web
@@ -179,8 +184,8 @@ Puedes usar MongoDB Atlas u otra instancia compatible:
 1. Crea una base de datos y un usuario con permisos sobre ella.
 2. Autoriza la conexión desde tu máquina en las reglas de acceso de red de
    MongoDB.
-3. Copia la URI de conexión y reemplaza el marcador
-   `tu_uri_de_mongodb` en la configuración del siguiente paso.
+3. Copia la URI de conexión y reemplaza el marcador `TU_CLUSTER` en la
+   configuración del siguiente paso.
 
 La base de datos predeterminada se llama `techgear`; puedes cambiarla con
 `DB_NAME`.
@@ -194,7 +199,6 @@ ejemplo (no incluyas credenciales reales en Git):
 MONGODB_URI=mongodb+srv://USUARIO:CLAVE@TU_CLUSTER/techgear?retryWrites=true&w=majority
 SECRET_KEY=reemplaza-por-una-clave-larga-y-aleatoria
 DB_NAME=techgear
-ADMIN_REGISTRATION_CODE=codigo-local-de-administrador
 ```
 
 Genera claves aleatorias únicas para tus entornos. Django, por su parte, lee su
@@ -240,7 +244,8 @@ Abre estas direcciones en el navegador:
 
 | Dirección | Contenido |
 | --- | --- |
-| <http://127.0.0.1:8000/> | Catálogo de la tienda |
+| <http://127.0.0.1:8000/> | Portada de la tienda |
+| <http://127.0.0.1:8000/catalogo/> | Catálogo y productos disponibles |
 | <http://127.0.0.1:8000/docs> | Documentación interactiva de FastAPI |
 | <http://127.0.0.1:8000/openapi.json> | Esquema OpenAPI |
 | <http://127.0.0.1:8000/health> | Estado de la API y conexión a MongoDB |
@@ -258,11 +263,10 @@ Detén el servidor con `Ctrl+C`.
 | `DB_NAME` | FastAPI | No | Base de datos MongoDB; predeterminada: `techgear`. |
 | `ALGORITHM` | FastAPI | No | Algoritmo JWT; predeterminado: `HS256`. |
 | `ACCESS_TOKEN_EXPIRE_MINUTES` | FastAPI | No | Duración del token en minutos; predeterminada: `60`. |
-| `ADMIN_REGISTRATION_CODE` | FastAPI | Recomendado | Código requerido para registrar cuentas con rol `admin`. |
 | `DJANGO_SECRET_KEY` | Django | En producción | Secreto de Django. Es obligatorio en Render y Vercel. |
 | `DJANGO_DEBUG` | Django | No | Activa el modo de depuración cuando es `true`; no usar en producción. |
-| `API_URL` | Django | No | URL base de FastAPI si no comparte el dominio actual. |
-| `PORT` | Django | No | Puerto local usado para construir la URL de API predeterminada. |
+| `API_URL` | Django | No | URL base de FastAPI; fuera de Vercel se deriva de `PORT`, y en Vercel del dominio del despliegue si no se define explícitamente. El enlace **API** de la navegación abre `{API_URL}/docs`. |
+| `PORT` | Django | No | Puerto usado para construir la URL de API predeterminada fuera de Vercel; en local, predeterminado: `8000`. |
 | `DJANGO_ALLOWED_HOSTS` | Django | No | Hosts adicionales, separados por comas. |
 | `DJANGO_CSRF_TRUSTED_ORIGINS` | Django | No | Orígenes CSRF adicionales, separados por comas e incluyendo esquema. |
 
@@ -272,20 +276,28 @@ lugar de guardarlas en `.env`. Django no lee automáticamente el archivo
 
 ## 🛍️ Uso de la tienda
 
-1. Registra una cuenta de cliente desde `/registro/` e inicia sesión en
-   `/login/`.
-2. Explora el catálogo. Si el stock es cero, el producto se muestra como
-   agotado y no se puede añadir al pedido.
-3. Crea pedidos y consulta su estado desde `/pedidos/`.
-4. Completa el formulario de pago de demostración con los valores de prueba que
-   aparecen en pantalla. El formulario no realiza cobros reales.
-5. Para administrar productos y pedidos, registra un usuario con rol
-   `admin` y el valor de `ADMIN_REGISTRATION_CODE`; después usa `/panel/` y
-   `/pedidos/`.
+1. Crea una cuenta de cliente en `/registro/` e inicia sesión en `/login/`.
+   Las cuentas de cliente son necesarias para agregar productos al carrito y
+   comprar.
+2. Explora `/catalogo/`, selecciona las cantidades disponibles y agrega los
+   productos. Las cantidades se acumulan en el carrito de la sesión; navegar
+   entre páginas no lo vacía mientras la sesión siga activa.
+3. Abre `/pedidos/` para revisar los pedidos y el checkout. Indica dirección,
+   celular y código postal, y elige tarjeta, Nequi o transferencia para
+   confirmar el pago de demostración.
+4. El inventario se descuenta únicamente cuando el pago se confirma. La API
+   vuelve a validar la disponibilidad al procesar el pago y rechaza la
+   operación si no hay existencias suficientes.
+5. Consulta el seguimiento del pedido en `/pedidos/`. El cliente puede
+   confirmar su recepción cuando corresponda.
+6. Para administrar la tienda, inicia sesión con la cuenta fija
+   `admin@gmail.com` / `1234567`. Usa `/panel/` para publicar o eliminar
+   productos y `/pedidos/` para revisar pedidos por estado y marcarlos como
+   enviados.
 
-Los roles de usuario de TechGear se gestionan en la aplicación. La ruta
-`/admin/` corresponde a la interfaz administrativa interna de Django y utiliza
-sus propias cuentas administrativas.
+La ruta `/admin/` es independiente: corresponde al sitio administrativo
+interno de Django y utiliza cuentas de Django, no la cuenta fija del panel de
+TechGear.
 
 ## 📡 API REST
 
@@ -299,7 +311,7 @@ OAuth2 de formulario. Las rutas marcadas como protegidas requieren
 | --- | --- | --- | --- |
 | `GET` | `/health` | Público | Comprueba la API y la conexión a MongoDB. |
 | `POST` | `/auth/login` | Público | Inicia sesión y entrega un token Bearer. |
-| `POST` | `/usuarios/registro` | Público | Registra un cliente o, con código válido, un administrador. |
+| `POST` | `/usuarios/registro` | Público | Registra una cuenta de cliente; no permite registrar el administrador fijo. |
 | `GET` | `/usuarios/me` | Autenticado | Devuelve el usuario de la sesión. |
 | `GET` | `/usuarios` | Administrador | Lista los usuarios. |
 | `PATCH` | `/usuarios/{usuario_id}/rol` | Administrador | Actualiza el rol de un usuario. |
@@ -308,9 +320,9 @@ OAuth2 de formulario. Las rutas marcadas como protegidas requieren
 | `POST` | `/productos` | Administrador | Crea un producto. |
 | `PUT` | `/productos/{producto_id}` | Administrador | Actualiza un producto. |
 | `DELETE` | `/productos/{producto_id}` | Administrador | Elimina un producto. |
-| `POST` | `/pedidos` | Autenticado | Crea un pedido y valida/descuenta stock. |
+| `POST` | `/pedidos` | Autenticado | Crea un pedido pendiente y valida la disponibilidad, sin descontar stock. |
 | `GET` | `/pedidos` | Autenticado | Cliente: sus pedidos. Administrador: todos. |
-| `POST` | `/pedidos/{pedido_id}/pagar` | Cliente autenticado | Registra el pago simulado y los datos de entrega. |
+| `POST` | `/pedidos/{pedido_id}/pagar` | Cliente autenticado | Verifica y descuenta el stock y registra el pago simulado y los datos de entrega. |
 | `PATCH` | `/pedidos/{pedido_id}/enviar` | Administrador | Marca un pedido pagado como enviado. |
 | `PATCH` | `/pedidos/{pedido_id}/recibir` | Cliente autenticado | Confirma la recepción de un pedido propio. |
 
@@ -339,17 +351,17 @@ La forma más sencilla de explorar todos los esquemas y probar endpoints es
 ## 🧪 Pruebas y verificaciones
 
 Las pruebas Django actuales cubren rutas, llamadas a la API, presentación de
-productos agotados, precios y gestión de pedidos. Para ejecutarlas:
+productos agotados, búsqueda, precios colombianos, datos de producto y gestión
+administrativa de pedidos. Para ejecutarlas desde la raíz:
 
 ```bash
-cd techgear_web
-python manage.py test store
+python techgear_web/manage.py test store
 ```
 
 Para validar la configuración de Django:
 
 ```bash
-python manage.py check
+python techgear_web/manage.py check
 ```
 
 Las pruebas de tienda simulan las respuestas de FastAPI; para usar la aplicación
@@ -366,9 +378,7 @@ instalación y arranque y el health check en `/health`.
    `render.yaml`.
 2. Configura `MONGODB_URI`, `SECRET_KEY` y `DJANGO_SECRET_KEY` como variables
    privadas del servicio.
-3. Configura también `ADMIN_REGISTRATION_CODE` si vas a registrar
-   administradores.
-4. Despliega y comprueba que `/health` responda correctamente.
+3. Despliega y comprueba que `/health` responda correctamente.
 
 Render proporciona `RENDER_EXTERNAL_HOSTNAME`, que Django utiliza para
 reconocer el host del servicio.
@@ -382,8 +392,7 @@ para enrutar las solicitudes a la función FastAPI, que también monta Django.
    **Root Directory**.
 2. Agrega `MONGODB_URI`, `SECRET_KEY` y `DJANGO_SECRET_KEY` en los entornos
    (Production y/o Preview) donde vas a desplegar.
-3. Agrega `ADMIN_REGISTRATION_CODE` si necesitas registrar administradores.
-4. Guarda las variables y vuelve a desplegar.
+3. Guarda las variables y vuelve a desplegar.
 
 Vercel proporciona `VERCEL_URL`. En el despliegue combinado del repositorio,
 Django puede usarlo para llegar a FastAPI; si la API se aloja en otro dominio,
@@ -397,8 +406,9 @@ configura `API_URL`. Para dominios propios, revisa
 - Usa secretos largos, aleatorios, únicos y distintos por entorno.
 - Configura las variables sensibles en el panel seguro del proveedor.
 - Mantén `DJANGO_DEBUG` desactivado en producción.
-- El registro de administradores debe protegerse con
-  `ADMIN_REGISTRATION_CODE`.
+- El administrador de TechGear usa credenciales fijas documentadas en este
+  README. No publiques la aplicación con estas credenciales: cámbialas y
+  adapta la autenticación antes de exponerla a usuarios externos.
 - Las contraseñas se guardan con hash; las rutas protegidas de la API usan
   tokens Bearer.
 - Los datos de pago del sitio son ficticios: no reemplazan una pasarela de pago.
