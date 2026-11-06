@@ -1,6 +1,5 @@
 import re
 
-from django.conf import settings
 from django.contrib import messages
 from django.shortcuts import redirect, render
 from django.views.decorators.http import require_http_methods, require_POST
@@ -8,9 +7,6 @@ from django.views.decorators.http import require_http_methods, require_POST
 from . import api_client
 from .api_client import APIError
 from .decorators import admin_required, login_required
-
-
-FASTAPI_URL = settings.API_URL
 
 
 def _agregar_especificaciones_genericas(producto):

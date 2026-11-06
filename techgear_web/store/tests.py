@@ -70,6 +70,39 @@ class StoreProductSpecificationTests(SimpleTestCase):
         self.assertContains(response, "Especificaciones generales")
         self.assertContains(response, "Distribución de teclas en español")
         self.assertContains(response, "8 GB de memoria RAM")
+        self.assertContains(response, "$2.500.000")
+
+    @patch(
+        "store.views.api_client.listar_productos",
+        return_value=[
+            {
+                "id": "out-of-stock",
+                "nombre": "Producto agotado",
+                "categoria": "Accesorios",
+                "precio": 50000,
+                "stock": 0,
+            }
+        ],
+    )
+    def test_producto_sin_stock_muestra_controles_desactivados(self, _listar_productos):
+        session = self.client.session
+        session["token"] = "test-token"
+        session["usuario"] = {"rol": "cliente"}
+        session.save()
+        self.client.cookies[settings.SESSION_COOKIE_NAME] = session.session_key
+
+        response = self.client.get(reverse("catalogo"))
+
+        self.assertContains(response, "Agotado")
+        self.assertContains(response, 'name="cantidad"')
+        self.assertContains(response, "disabled aria-describedby")
+
+    @override_settings(API_URL="https://api.example.test/v1/")
+    @patch("store.views.api_client.listar_productos", return_value=[])
+    def test_enlace_api_apunta_a_la_url_configurada(self, _listar_productos):
+        response = self.client.get(reverse("catalogo"))
+
+        self.assertContains(response, 'href="https://api.example.test/v1/docs"')
 
     @patch(
         "store.views.api_client.listar_pedidos",
@@ -100,6 +133,72 @@ class StoreProductSpecificationTests(SimpleTestCase):
         response = self.client.get(reverse("pedidos"))
 
         self.assertContains(response, "Distribución de teclas en español")
+
+    @patch(
+        "store.views.api_client.listar_pedidos",
+        return_value=[
+            {
+                "id": "pending-1",
+                "estado": "pendiente",
+                "usuario_email": "cliente@example.test",
+                "total": 2500000,
+                "items": [
+                    {
+                        "nombre": "Portátil",
+                        "cantidad": 1,
+                        "subtotal": 2500000,
+                    }
+                ],
+            },
+            {
+                "id": "shipping-1",
+                "estado": "pendiente_envio",
+                "usuario_email": "cliente@example.test",
+                "total": 50000,
+                "direccion_envio": "Calle 1",
+                "telefono_envio": "3001234567",
+                "codigo_postal": "050001",
+                "items": [
+                    {
+                        "nombre": "Teclado",
+                        "cantidad": 1,
+                        "subtotal": 50000,
+                    }
+                ],
+            },
+            {
+                "id": "sent-1",
+                "estado": "enviado",
+                "usuario_email": "cliente@example.test",
+                "total": 50000,
+                "direccion_envio": "Calle 1",
+                "telefono_envio": "3001234567",
+                "codigo_postal": "050001",
+                "items": [
+                    {
+                        "nombre": "Teclado",
+                        "cantidad": 1,
+                        "subtotal": 50000,
+                    }
+                ],
+            },
+        ],
+    )
+    def test_admin_puede_revisar_pedidos_organizados_y_en_pesos(self, _listar_pedidos):
+        session = self.client.session
+        session["token"] = "test-token"
+        session["usuario"] = {"rol": "admin"}
+        session.save()
+        self.client.cookies[settings.SESSION_COOKIE_NAME] = session.session_key
+
+        response = self.client.get(reverse("pedidos"))
+
+        self.assertContains(response, "Resumen de pedidos")
+        self.assertContains(response, "Pendientes de pago")
+        self.assertContains(response, "Pendientes por enviar")
+        self.assertContains(response, "Enviados")
+        self.assertContains(response, "$2.500.000")
+        self.assertContains(response, "050001")
 
 
 class APIClientRoutingTests(SimpleTestCase):

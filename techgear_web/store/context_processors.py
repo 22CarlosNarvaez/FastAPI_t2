@@ -1,2 +1,5 @@
+from django.conf import settings
+
+
 def api(request):
-    return {"api_url": request.build_absolute_uri("/").rstrip("/")}
+    return {"api_url": settings.API_URL.rstrip("/")}

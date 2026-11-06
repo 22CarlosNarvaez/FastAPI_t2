@@ -1,4 +1,5 @@
 {% extends "store/base.html" %}
+{% load store_formatting %}
 {% block title %}Panel Admin{% endblock %}
 {% block content %}
 <div class="mb-4">
@@ -30,7 +31,7 @@
       {% for p in productos %}
       <tr>
         <td>{{ p.nombre }}</td><td>{{ p.categoria }}</td>
-        <td>${{ p.precio|floatformat:2 }}</td><td>{{ p.stock }}</td>
+        <td>{{ p.precio|cop }}</td><td>{{ p.stock }}</td>
         <td class="text-end">
           <form method="post" action="{% url 'eliminar_producto' p.id %}" onsubmit="return confirm('¿Eliminar?')">
             {% csrf_token %}<button class="btn btn-sm btn-outline-danger">Eliminar</button>
