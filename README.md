@@ -41,6 +41,8 @@ Los precios se presentan en pesos colombianos (COP).
 
 ### 🛍️ Tienda
 
+- Portada informativa con descripción de TechGear y enlaces de contacto de demostración.
+- Catálogo en una ruta independiente (`/catalogo/`) con búsqueda por nombre, categoría y descripción.
 - Catálogo de productos con imágenes, categoría, descripción y especificaciones.
 - Registro e inicio de sesión para clientes y administradores.
 - Creación de pedidos desde el catálogo.

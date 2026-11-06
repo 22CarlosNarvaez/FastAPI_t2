@@ -1,18 +1,33 @@
 {% extends "store/base.html" %}
 {% load static %}
 {% load store_formatting %}
-{% block title %}Tienda{% endblock %}
+{% block title %}Catálogo{% endblock %}
 {% block content %}
 <header class="catalog-hero text-center mx-auto mb-5">
-  <p class="eyebrow mb-2">Tecnología para tu día a día</p>
+  <p class="eyebrow mb-2">Catálogo TechGear</p>
   <h1 class="page-title mb-3">Encuentra tu próximo favorito.</h1>
-  <p class="text-secondary mb-0">Una selección de accesorios y dispositivos, elegidos para acompañarte.</p>
+  <p class="text-secondary mb-0">Explora accesorios y dispositivos para acompañarte todos los días.</p>
 </header>
+
+<form method="get" action="{% url 'catalogo' %}" class="catalog-search mx-auto mb-5" role="search">
+  <label class="visually-hidden" for="catalog-search-input">Buscar productos</label>
+  <input id="catalog-search-input" type="search" name="q" value="{{ busqueda }}"
+         class="form-control" placeholder="Buscar por producto, categoría o descripción">
+  <button class="btn btn-ink rounded-pill px-4" type="submit">Buscar</button>
+  {% if busqueda %}
+    <a class="btn btn-outline-secondary rounded-pill px-4" href="{% url 'catalogo' %}">Limpiar</a>
+  {% endif %}
+</form>
 
 {% if error %}
   <div class="alert alert-warning text-center mx-auto" style="max-width: 720px">{{ error }}</div>
 {% elif not productos %}
-  <div class="alert alert-light border text-center mx-auto py-4" style="max-width: 720px">Pronto encontrarás nuevos productos aquí.</div>
+  <div class="alert alert-light border text-center mx-auto py-4" style="max-width: 720px">
+    {% if busqueda %}No encontramos productos para “{{ busqueda }}”. Prueba con otra búsqueda.
+    {% else %}Pronto encontrarás nuevos productos aquí.{% endif %}
+  </div>
+{% elif busqueda %}
+  <p class="text-secondary mb-4" role="status">{{ productos|length }} resultado{{ productos|length|pluralize }} para “{{ busqueda }}”.</p>
 {% endif %}
 
 <div class="row row-cols-1 row-cols-sm-2 row-cols-lg-3 g-4 justify-content-center">

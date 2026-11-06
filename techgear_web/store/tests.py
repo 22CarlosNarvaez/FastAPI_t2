@@ -11,7 +11,8 @@ from store import api_client
 class StoreRoutingTests(SimpleTestCase):
     def test_named_routes_resolve_to_expected_paths(self):
         routes = (
-            ("catalogo", (), "/"),
+            ("inicio", (), "/"),
+            ("catalogo", (), "/catalogo/"),
             ("login", (), "/login/"),
             ("registro", (), "/registro/"),
             ("logout", (), "/logout/"),
@@ -34,6 +35,24 @@ class StoreRoutingTests(SimpleTestCase):
         response = self.client.post(reverse("logout"))
 
         self.assertRedirects(response, reverse("catalogo"), fetch_redirect_response=False)
+
+
+@override_settings(
+    STORAGES={
+        "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
+        "staticfiles": {"BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage"},
+    }
+)
+class StoreLandingTests(SimpleTestCase):
+    def test_portada_describe_techgear_y_muestra_contactos_de_demostracion(self):
+        response = self.client.get(reverse("inicio"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "En TechGear acercamos accesorios y dispositivos")
+        self.assertContains(response, "https://mail.google.com/mail/?view=cm&amp;fs=1&amp;to=hola.techgear.demo@gmail.com")
+        self.assertContains(response, "https://www.instagram.com/techgear.demo/")
+        self.assertContains(response, "https://wa.me/573000000000")
+        self.assertContains(response, "reemplázalos por los canales oficiales")
 
 
 @override_settings(
@@ -71,6 +90,71 @@ class StoreProductSpecificationTests(SimpleTestCase):
         self.assertContains(response, "Distribución de teclas en español")
         self.assertContains(response, "8 GB de memoria RAM")
         self.assertContains(response, "$2.500.000")
+
+    @patch(
+        "store.views.api_client.listar_productos",
+        return_value=[
+            {
+                "id": "mouse-1",
+                "nombre": "Mouse inalámbrico",
+                "categoria": "Accesorios",
+                "descripcion": "Promesa de batería de larga duración",
+                "precio": 50000,
+                "stock": 2,
+            },
+            {
+                "id": "keyboard-1",
+                "nombre": "Teclado",
+                "categoria": "Accesorios",
+                "descripcion": "Teclas cómodas",
+                "precio": 80000,
+                "stock": 2,
+            },
+        ],
+    )
+    def test_busqueda_filtra_catalogo_y_usa_descripcion_fiable_para_mouse(self, _listar_productos):
+        response = self.client.get(reverse("catalogo"), {"q": "mouse"})
+
+        self.assertContains(response, "Mouse de uso diario para controlar el cursor")
+        self.assertNotContains(response, "Promesa de batería de larga duración")
+        self.assertNotContains(response, "Teclado")
+
+    @patch("store.views.api_client.listar_productos", return_value=[])
+    def test_busqueda_sin_resultados_muestra_estado_vacio(self, _listar_productos):
+        response = self.client.get(reverse("catalogo"), {"q": "no existe"})
+
+        self.assertContains(response, "No encontramos productos para")
+
+    @patch("store.views.api_client.listar_productos", return_value=[])
+    def test_catalogo_busca_tambien_por_categoria_y_descripcion(self, listar_productos):
+        listar_productos.return_value = [
+            {
+                "id": "one",
+                "nombre": "Periférico",
+                "categoria": "Audio",
+                "descripcion": "Sonido envolvente",
+                "precio": 50000,
+                "stock": 1,
+            },
+            {
+                "id": "two",
+                "nombre": "Accesorio",
+                "categoria": "Oficina",
+                "descripcion": "Uso diario",
+                "precio": 80000,
+                "stock": 1,
+            },
+        ]
+
+        response = self.client.get(reverse("catalogo"), {"q": "sonido"})
+
+        self.assertContains(response, "Periférico")
+        self.assertNotContains(response, "Uso diario")
+
+        response = self.client.get(reverse("catalogo"), {"q": "audio"})
+
+        self.assertContains(response, "Periférico")
+        self.assertNotContains(response, "Uso diario")
 
     @patch(
         "store.views.api_client.listar_productos",

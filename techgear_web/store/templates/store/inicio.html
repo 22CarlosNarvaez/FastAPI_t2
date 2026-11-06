@@ -1,0 +1,72 @@
+{% extends "store/base.html" %}
+{% block title %}Inicio{% endblock %}
+{% block content %}
+<section class="landing-hero">
+  <div class="landing-copy">
+    <p class="eyebrow">Tecnología para tu día a día</p>
+    <h1 class="page-title mb-4">Tu próximo equipo empieza aquí.</h1>
+    <p class="landing-lead text-secondary mb-4">
+      En TechGear acercamos accesorios y dispositivos tecnológicos a quienes quieren
+      trabajar, estudiar y disfrutar con herramientas útiles. Explora nuestra selección,
+      consulta la disponibilidad y gestiona tus pedidos en un solo lugar.
+    </p>
+    <div class="d-flex flex-wrap gap-3">
+      <a class="btn btn-ink rounded-pill px-4 py-2" href="{% url 'catalogo' %}">Explorar catálogo</a>
+      <a class="btn btn-outline-secondary rounded-pill px-4 py-2" href="#contacto">Conócenos y contáctanos</a>
+    </div>
+  </div>
+  <div class="landing-highlight" aria-label="Lo que ofrece TechGear">
+    <span class="landing-highlight-icon" aria-hidden="true">TG</span>
+    <p class="eyebrow mb-2">TechGear</p>
+    <h2 class="h3 mb-3">Tecnología práctica, compra sencilla.</h2>
+    <p class="text-secondary mb-0">
+      Revisa productos, compara sus descripciones y acompaña tu compra desde el pedido
+      hasta la entrega.
+    </p>
+  </div>
+</section>
+
+<section class="landing-about py-5" aria-labelledby="about-title">
+  <p class="eyebrow">Nuestra propuesta</p>
+  <h2 id="about-title" class="h2 mb-3">Una tienda pensada para elegir con confianza.</h2>
+  <p class="text-secondary mb-0">
+    Somos TechGear, una empresa enfocada en productos de tecnología y accesorios
+    para el uso cotidiano. Queremos que encuentres información clara, disponibilidad
+    visible y una forma simple de hacer seguimiento a tus pedidos.
+  </p>
+</section>
+
+<section id="contacto" class="contact-section py-5" aria-labelledby="contact-title">
+  <div class="d-flex flex-wrap align-items-end justify-content-between gap-3 mb-4">
+    <div>
+      <p class="eyebrow">Hablemos</p>
+      <h2 id="contact-title" class="h2 mb-0">Estamos para ayudarte.</h2>
+    </div>
+    <p class="text-secondary mb-0">Escríbenos por el canal que prefieras.</p>
+  </div>
+  <p class="text-secondary mb-4">reemplázalos por los canales oficiales</p>
+  <div class="row row-cols-1 row-cols-md-3 g-3">
+    <div class="col">
+      <a class="contact-card card h-100 p-4" href="https://mail.google.com/mail/?view=cm&amp;fs=1&amp;to=hola.techgear.demo@gmail.com" target="_blank" rel="noopener noreferrer">
+        <span class="eyebrow">Correo</span>
+        <strong>hola.techgear.demo@gmail.com</strong>
+        <span class="text-secondary small">Abrir un mensaje en Gmail</span>
+      </a>
+    </div>
+    <div class="col">
+      <a class="contact-card card h-100 p-4" href="https://www.instagram.com/techgear.demo/" target="_blank" rel="noopener noreferrer">
+        <span class="eyebrow">Instagram</span>
+        <strong>@techgear.demo</strong>
+        <span class="text-secondary small">Visitar nuestro perfil</span>
+      </a>
+    </div>
+    <div class="col">
+      <a class="contact-card card h-100 p-4" href="https://wa.me/573000000000?text=Hola%2C%20TechGear%2C%20quiero%20hacer%20una%20consulta." target="_blank" rel="noopener noreferrer">
+        <span class="eyebrow">WhatsApp</span>
+        <strong>+57 300 000 0000</strong>
+        <span class="text-secondary small">Iniciar una conversación</span>
+      </a>
+    </div>
+  </div>
+ </section>
+{% endblock %}

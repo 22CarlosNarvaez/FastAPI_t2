@@ -9,9 +9,54 @@ from .api_client import APIError
 from .decorators import admin_required, login_required
 
 
+def _get_carrito(request):
+    carrito = request.session.get("carrito") or []
+    if not isinstance(carrito, list):
+        carrito = []
+    limpio = []
+    for item in carrito:
+        if not isinstance(item, dict):
+            continue
+        producto_id = str(item.get("producto_id") or "").strip()
+        cantidad = int(item.get("cantidad") or 1)
+        if not producto_id or cantidad < 1:
+            continue
+        limpio.append({"producto_id": producto_id, "cantidad": cantidad})
+    request.session["carrito"] = limpio
+    return limpio
+
+
+def _carrito_resumen(request):
+    carrito = _get_carrito(request)
+    productos = []
+    try:
+        catalogo = api_client.listar_productos()
+    except APIError:
+        catalogo = []
+    catalogo_por_id = {str(p["id"]): p for p in catalogo}
+    for item in carrito:
+        producto = catalogo_por_id.get(item["producto_id"], {})
+        cantidad = max(1, int(item.get("cantidad", 1)))
+        productos.append({
+            "producto_id": item["producto_id"],
+            "nombre": producto.get("nombre") or item["producto_id"],
+            "precio_unitario": float(producto.get("precio", 0) or 0),
+            "cantidad": cantidad,
+            "subtotal": float(producto.get("precio", 0) or 0) * cantidad,
+            "stock": int(producto.get("stock", 0) or 0),
+        })
+    return productos
+
+
 def _agregar_especificaciones_genericas(producto):
     descripcion = f"{producto.get('nombre', '')} {producto.get('categoria', '')}".casefold()
-    if "teclad" in descripcion:
+    if "mouse" in descripcion or "ratón" in descripcion:
+        producto["descripcion"] = (
+            "Mouse de uso diario para controlar el cursor y navegar en tu equipo. "
+            "La conectividad y las funciones dependen del modelo; consulta su ficha "
+            "para confirmar los detalles antes de comprar."
+        )
+    elif "teclad" in descripcion:
         producto["especificaciones"] = [
             "Conexión USB compatible con equipos estándar",
             "Distribución de teclas en español",
@@ -33,16 +78,35 @@ def _sesion_expirada(request):
     return redirect("login")
 
 
+def inicio(request):
+    return render(request, "store/inicio.html")
+
+
 def catalogo(request):
     productos, error = [], None
+    busqueda = request.GET.get("q", "").strip()
     try:
         productos = [
             _agregar_especificaciones_genericas(producto)
             for producto in api_client.listar_productos()
         ]
+        if busqueda:
+            termino = busqueda.casefold()
+            productos = [
+                producto
+                for producto in productos
+                if any(
+                    termino in str(producto.get(campo) or "").casefold()
+                    for campo in ("nombre", "descripcion", "categoria")
+                )
+            ]
     except APIError as e:
         error = str(e)
-    return render(request, "store/catalogo.html", {"productos": productos, "error": error})
+    return render(
+        request,
+        "store/catalogo.html",
+        {"productos": productos, "error": error, "busqueda": busqueda},
+    )
 
 
 @require_http_methods(["GET", "POST"])
@@ -63,11 +127,20 @@ def login_view(request):
 @require_http_methods(["GET", "POST"])
 def registro_view(request):
     if request.method == "POST":
+        email = (request.POST.get("email") or "").strip().lower()
+        rol = request.POST.get("rol", "cliente")
+        if rol == "admin" or email == "admin@gmail.com":
+            messages.error(
+                request,
+                "El administrador usa la cuenta fija admin@gmail.com con contraseña 1234567. No requiere registro.",
+            )
+            return redirect("login")
+
         payload = {
             "nombre": request.POST["nombre"],
-            "email": request.POST["email"],
+            "email": email,
             "password": request.POST["password"],
-            "rol": request.POST.get("rol", "cliente"),
+            "rol": rol,
             "codigo_admin": request.POST.get("codigo_admin") or None,
         }
         try:
@@ -90,26 +163,31 @@ def logout_view(request):
 @login_required
 @require_POST
 def pedir(request, producto_id):
+    if request.session.get("usuario", {}).get("rol") != "cliente":
+        messages.error(request, "Solo los clientes pueden agregar productos al carrito.")
+        return redirect("catalogo")
     try:
         cantidad = max(1, int(request.POST.get("cantidad", 1)))
-        api_client.crear_pedido(
-            request.session["token"], [{"producto_id": producto_id, "cantidad": cantidad}]
-        )
     except ValueError:
         messages.error(request, "Cantidad inválida.")
-    except APIError as e:
-        if e.status == 401:
-            return _sesion_expirada(request)
-        messages.error(request, str(e))
+        return redirect("catalogo")
+
+    carrito = _get_carrito(request)
+    existente = next((item for item in carrito if item["producto_id"] == producto_id), None)
+    if existente is None:
+        carrito.append({"producto_id": producto_id, "cantidad": cantidad})
     else:
-        messages.success(request, "¡Pedido realizado!")
-        return redirect("pedidos")
+        existente["cantidad"] = existente.get("cantidad", 0) + cantidad
+    request.session["carrito"] = carrito
+    messages.success(request, "Producto agregado al carrito.")
     return redirect("catalogo")
 
 
 @login_required
 def pedidos(request):
     lista, error = [], None
+    carrito = _carrito_resumen(request)
+    total_carrito = sum(item["subtotal"] for item in carrito)
     try:
         lista = api_client.listar_pedidos(request.session["token"])
         for pedido in lista:
@@ -130,6 +208,8 @@ def pedidos(request):
             ],
             "pedidos_enviados": [p for p in lista if p["estado"] == "enviado"],
             "error": error,
+            "carrito": carrito,
+            "total_carrito": total_carrito,
         },
     )
 
@@ -158,68 +238,51 @@ def pagar_pedidos(request):
         messages.error(request, "Solo los clientes pueden pagar pedidos.")
         return redirect("pedidos")
 
-    pedido_ids = list(dict.fromkeys(request.POST.getlist("pedido_id")))
-    if not pedido_ids:
-        messages.error(request, "Selecciona al menos un pedido pendiente.")
-        return redirect("pedidos")
+    carrito = _get_carrito(request)
+    if not carrito:
+        messages.error(request, "Tu carrito está vacío.")
+        return redirect("catalogo")
 
-    metodos_validos = {"tarjeta", "nequi", "transferencia"}
     metodo_pago = request.POST.get("metodo_pago", "")
-    referencia = request.POST.get("referencia_prueba", "").strip().upper()
     direccion = request.POST.get("direccion", "").strip()
     telefono = request.POST.get("telefono", "").strip()
     codigo_postal = request.POST.get("codigo_postal", "").strip()
-    referencia_valida = re.fullmatch(r"DEMO-[A-Z0-9]{4,12}", referencia)
     if (
-        metodo_pago not in metodos_validos
-        or not referencia_valida
+        metodo_pago not in {"tarjeta", "nequi", "transferencia"}
         or not 5 <= len(direccion) <= 180
         or not re.fullmatch(r"\+?[0-9][0-9\s-]{6,15}", telefono)
         or not re.fullmatch(r"[0-9]{6}", codigo_postal)
     ):
         messages.error(
             request,
-            "Revisa método de pago, dirección, celular, código postal de 6 dígitos "
-            "y referencia ficticia.",
+            "Revisa método de pago, dirección, celular y código postal de 6 dígitos.",
         )
         return redirect("pedidos")
 
-    pagos_registrados = 0
-    errores = []
-    for pedido_id in pedido_ids:
-        try:
-            api_client.pagar_pedido(
-                request.session["token"],
-                pedido_id,
-                metodo_pago,
-                direccion,
-                telefono,
-                codigo_postal,
-            )
-        except APIError as e:
-            if e.status == 401:
-                return _sesion_expirada(request)
-            errores.append(str(e))
-        else:
-            pagos_registrados += 1
-
-    if errores:
-        if pagos_registrados:
-            messages.warning(
-                request,
-                f"Se registraron {pagos_registrados} pagos simulados; "
-                f"{len(errores)} pedido(s) no se pudieron pagar. No se realizó ningún cobro real.",
-            )
-        for error in errores:
-            messages.error(request, error)
-    elif pagos_registrados:
-        messages.success(
-            request,
-            f"Cobro simulado exitoso para {pagos_registrados} pedido(s). "
-            "Ahora aparecen en «Pendientes por enviar». No se realizó ningún cobro real.",
+    try:
+        pedido = api_client.crear_pedido(
+            request.session["token"],
+            [{"producto_id": item["producto_id"], "cantidad": item["cantidad"]} for item in carrito],
         )
-
-    return redirect("pedidos")
+        api_client.pagar_pedido(
+            request.session["token"],
+            pedido["id"],
+            metodo_pago,
+            direccion,
+            telefono,
+            codigo_postal,
+        )
+    except ValueError:
+        messages.error(request, "Cantidad inválida.")
+    except APIError as e:
+        if e.status == 401:
+            return _sesion_expirada(request)
+        messages.error(request, str(e))
+    else:
+        request.session["carrito"] = []
+        messages.success(request, "¡Pedido pagado con éxito! El stock se actualizó al confirmar el pago.")
+        return redirect("pedidos")
+    return redirect("catalogo")
 
 
 @admin_required

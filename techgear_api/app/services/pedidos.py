@@ -15,42 +15,37 @@ def to_out(doc: dict) -> dict:
 
 
 def crear(usuario: dict, data: PedidoCreate) -> dict:
-    descontados: list[tuple] = []
     items: list[dict] = []
-    try:
-        for it in data.items:
-            oid = to_object_id(it.producto_id)
-            # Descuento atómico: solo si hay stock suficiente
-            prod = col_productos.find_one_and_update(
-                {"_id": oid, "stock": {"$gte": it.cantidad}},
-                {"$inc": {"stock": -it.cantidad}},
+    for it in data.items:
+        oid = to_object_id(it.producto_id)
+        prod = col_productos.find_one({"_id": oid})
+        if prod is None:
+            raise HTTPException(
+                status.HTTP_400_BAD_REQUEST,
+                f"Producto inexistente ({it.producto_id})",
             )
-            if prod is None:
-                raise HTTPException(
-                    status.HTTP_400_BAD_REQUEST,
-                    f"Stock insuficiente o producto inexistente ({it.producto_id})",
-                )
-            descontados.append((oid, it.cantidad))
-            items.append({
-                "producto_id": it.producto_id,
-                "nombre": prod["nombre"],
-                "precio_unitario": prod["precio"],
-                "cantidad": it.cantidad,
-                "subtotal": round(prod["precio"] * it.cantidad, 2),
-            })
-        doc = {
-            "usuario_id": str(usuario["_id"]),
-            "usuario_email": usuario["email"],
-            "items": items,
-            "total": round(sum(i["subtotal"] for i in items), 2),
-            "estado": "pendiente",
-            "fecha": datetime.now(timezone.utc),
-        }
-        res = col_pedidos.insert_one(doc)
-    except Exception:
-        for oid, cantidad in descontados:
-            col_productos.update_one({"_id": oid}, {"$inc": {"stock": cantidad}})
-        raise
+        if prod.get("stock", 0) < it.cantidad:
+            raise HTTPException(
+                status.HTTP_400_BAD_REQUEST,
+                f"Stock insuficiente o producto inexistente ({it.producto_id})",
+            )
+        items.append({
+            "producto_id": it.producto_id,
+            "nombre": prod["nombre"],
+            "precio_unitario": prod["precio"],
+            "cantidad": it.cantidad,
+            "subtotal": round(prod["precio"] * it.cantidad, 2),
+        })
+
+    doc = {
+        "usuario_id": str(usuario["_id"]),
+        "usuario_email": usuario["email"],
+        "items": items,
+        "total": round(sum(i["subtotal"] for i in items), 2),
+        "estado": "pendiente",
+        "fecha": datetime.now(timezone.utc),
+    }
+    res = col_pedidos.insert_one(doc)
 
     doc["_id"] = res.inserted_id
     return to_out(doc)
@@ -66,13 +61,34 @@ def pagar(pedido_id: str, usuario: dict, pago: PagoPedido) -> dict:
     if usuario["rol"] != "cliente":
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Solo los clientes pueden pagar pedidos")
 
-    filtro = {
+    pedido = col_pedidos.find_one({
         "_id": to_object_id(pedido_id),
         "usuario_id": str(usuario["_id"]),
         "estado": "pendiente",
-    }
+    })
+    if pedido is None:
+        existente = col_pedidos.find_one({
+            "_id": to_object_id(pedido_id),
+            "usuario_id": str(usuario["_id"]),
+        })
+        if existente is None:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "Pedido no encontrado")
+        raise HTTPException(status.HTTP_409_CONFLICT, "El pedido ya fue pagado")
+
+    for item in pedido["items"]:
+        oid = to_object_id(item["producto_id"])
+        producto = col_productos.find_one({"_id": oid})
+        if producto is None:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, f"Producto inexistente ({item['producto_id']})")
+        if producto.get("stock", 0) < item["cantidad"]:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, f"Stock insuficiente para {producto.get('nombre', item['producto_id'])}")
+
+    for item in pedido["items"]:
+        oid = to_object_id(item["producto_id"])
+        col_productos.update_one({"_id": oid}, {"$inc": {"stock": -item["cantidad"]}})
+
     pedido = col_pedidos.find_one_and_update(
-        filtro,
+        {"_id": to_object_id(pedido_id), "usuario_id": str(usuario["_id"]), "estado": "pendiente"},
         {"$set": {
             "estado": "pendiente_envio",
             "metodo_pago": pago.metodo_pago.value,
@@ -82,14 +98,6 @@ def pagar(pedido_id: str, usuario: dict, pago: PagoPedido) -> dict:
         }},
         return_document=ReturnDocument.AFTER,
     )
-    if pedido is None:
-        existente = col_pedidos.find_one({
-            "_id": to_object_id(pedido_id),
-            "usuario_id": str(usuario["_id"]),
-        })
-        if existente is None:
-            raise HTTPException(status.HTTP_404_NOT_FOUND, "Pedido no encontrado")
-        raise HTTPException(status.HTTP_409_CONFLICT, "El pedido ya fue pagado")
     return to_out(pedido)
 
 
