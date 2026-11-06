@@ -1,4 +1,5 @@
 {% extends "store/base.html" %}
+{% load static %}
 {% block title %}Inicio{% endblock %}
 {% block content %}
 <section class="landing-hero">
@@ -15,14 +16,48 @@
       <a class="btn btn-outline-secondary rounded-pill px-4 py-2" href="#contacto">Conócenos y contáctanos</a>
     </div>
   </div>
-  <div class="landing-highlight" aria-label="Lo que ofrece TechGear">
-    <span class="landing-highlight-icon" aria-hidden="true">TG</span>
-    <p class="eyebrow mb-2">TechGear</p>
-    <h2 class="h3 mb-3">Tecnología práctica, compra sencilla.</h2>
-    <p class="text-secondary mb-0">
-      Revisa productos, compara sus descripciones y acompaña tu compra desde el pedido
-      hasta la entrega.
-    </p>
+  <figure class="landing-image-card mb-0">
+    <img
+      src="{% static 'store/img/landing-hero.jpg' %}"
+      alt="Computador portátil abierto sobre un escritorio de trabajo"
+      fetchpriority="high"
+      decoding="async">
+    <figcaption class="landing-image-caption">
+      <span class="eyebrow mb-1">Tu espacio, mejor equipado</span>
+      <strong>Ideas y tecnología para todos los días.</strong>
+    </figcaption>
+  </figure>
+</section>
+
+<section class="landing-gallery py-4" aria-labelledby="gallery-title">
+  <div class="d-flex flex-wrap align-items-end justify-content-between gap-3 mb-4">
+    <div>
+      <p class="eyebrow">Inspiración TechGear</p>
+      <h2 id="gallery-title" class="h2 mb-0">Tecnología que acompaña tus ideas.</h2>
+    </div>
+    <a class="link-secondary" href="{% url 'catalogo' %}">Descubre el catálogo <span aria-hidden="true">→</span></a>
+  </div>
+  <div class="row g-3">
+    <div class="col-12 col-md-7">
+      <figure class="landing-gallery-card mb-0">
+        <img
+          src="{% static 'store/img/landing-workspace.jpg' %}"
+          alt="Personas colaborando con computadores en un espacio de trabajo"
+          loading="lazy"
+          decoding="async">
+        <figcaption>Un espacio preparado para crear.</figcaption>
+      </figure>
+    </div>
+    <div class="col-12 col-md-5">
+      <figure class="landing-gallery-card mb-0">
+        <img
+          src="{% static 'store/img/landing-wearable.jpg' %}"
+          alt="Reloj inteligente de diseño moderno"
+          loading="lazy"
+          decoding="async">
+        <figcaption>Detalles que hacen la diferencia.</figcaption>
+      </figure>
+    </div>
   </div>
 </section>
 

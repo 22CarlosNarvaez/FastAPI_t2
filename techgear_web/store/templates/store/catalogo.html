@@ -20,7 +20,7 @@
 </form>
 
 {% if error %}
-  <div class="alert alert-warning text-center mx-auto" style="max-width: 720px">{{ error }}</div>
+  <div class="alert alert-warning text-center mx-auto" role="alert" style="max-width: 720px">{{ error }}</div>
 {% elif not productos %}
   <div class="alert alert-light border text-center mx-auto py-4" style="max-width: 720px">
     {% if busqueda %}No encontramos productos para “{{ busqueda }}”. Prueba con otra búsqueda.

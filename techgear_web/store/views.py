@@ -10,29 +10,36 @@ from .decorators import admin_required, login_required
 
 
 def _get_carrito(request):
-    carrito = request.session.get("carrito") or []
+    carrito = request.session.get("carrito", [])
+    datos_invalidos = False
     if not isinstance(carrito, list):
+        datos_invalidos = True
         carrito = []
     limpio = []
     for item in carrito:
         if not isinstance(item, dict):
+            datos_invalidos = True
             continue
         producto_id = str(item.get("producto_id") or "").strip()
-        cantidad = int(item.get("cantidad") or 1)
+        try:
+            cantidad = int(item.get("cantidad"))
+        except (TypeError, ValueError):
+            datos_invalidos = True
+            continue
         if not producto_id or cantidad < 1:
+            datos_invalidos = True
             continue
         limpio.append({"producto_id": producto_id, "cantidad": cantidad})
     request.session["carrito"] = limpio
+    if datos_invalidos:
+        messages.warning(request, "Se corrigieron datos incompletos o inválidos del carrito.")
     return limpio
 
 
 def _carrito_resumen(request):
     carrito = _get_carrito(request)
     productos = []
-    try:
-        catalogo = api_client.listar_productos()
-    except APIError:
-        catalogo = []
+    catalogo = api_client.listar_productos()
     catalogo_por_id = {str(p["id"]): p for p in catalogo}
     for item in carrito:
         producto = catalogo_por_id.get(item["producto_id"], {})
@@ -112,8 +119,13 @@ def catalogo(request):
 @require_http_methods(["GET", "POST"])
 def login_view(request):
     if request.method == "POST":
+        email = (request.POST.get("email") or "").strip()
+        password = request.POST.get("password") or ""
+        if not email or not password:
+            messages.error(request, "Ingresa tu correo y contraseña.")
+            return render(request, "store/login.html", status=400)
         try:
-            data = api_client.login(request.POST["email"], request.POST["password"])
+            data = api_client.login(email, password)
         except APIError as e:
             messages.error(request, str(e))
         else:
@@ -128,7 +140,12 @@ def login_view(request):
 def registro_view(request):
     if request.method == "POST":
         email = (request.POST.get("email") or "").strip().lower()
+        nombre = (request.POST.get("nombre") or "").strip()
+        password = request.POST.get("password") or ""
         rol = request.POST.get("rol", "cliente")
+        if len(nombre) < 2 or not email or len(password) < 6:
+            messages.error(request, "Ingresa un nombre válido, correo y contraseña de al menos 6 caracteres.")
+            return render(request, "store/registro.html", status=400)
         if rol == "admin" or email == "admin@gmail.com":
             messages.error(
                 request,
@@ -137,9 +154,9 @@ def registro_view(request):
             return redirect("login")
 
         payload = {
-            "nombre": request.POST["nombre"],
+            "nombre": nombre,
             "email": email,
-            "password": request.POST["password"],
+            "password": password,
             "rol": rol,
             "codigo_admin": request.POST.get("codigo_admin") or None,
         }
@@ -167,17 +184,40 @@ def pedir(request, producto_id):
         messages.error(request, "Solo los clientes pueden agregar productos al carrito.")
         return redirect("catalogo")
     try:
-        cantidad = max(1, int(request.POST.get("cantidad", 1)))
-    except ValueError:
-        messages.error(request, "Cantidad inválida.")
+        cantidad = int(request.POST.get("cantidad", ""))
+    except (TypeError, ValueError):
+        messages.error(request, "Ingresa una cantidad válida.")
+        return redirect("catalogo")
+    if cantidad < 1:
+        messages.error(request, "La cantidad debe ser al menos una unidad.")
+        return redirect("catalogo")
+
+    try:
+        producto = next(
+            (item for item in api_client.listar_productos() if str(item.get("id")) == producto_id),
+            None,
+        )
+    except APIError as e:
+        messages.error(request, str(e))
+        return redirect("catalogo")
+    if producto is None:
+        messages.error(request, "El producto ya no está disponible.")
         return redirect("catalogo")
 
     carrito = _get_carrito(request)
     existente = next((item for item in carrito if item["producto_id"] == producto_id), None)
+    cantidad_actual = existente["cantidad"] if existente else 0
+    disponible = int(producto.get("stock", 0) or 0) - cantidad_actual
+    if cantidad > disponible:
+        messages.error(
+            request,
+            f"Solo hay {max(0, disponible)} unidad(es) disponibles para agregar al carrito.",
+        )
+        return redirect("catalogo")
     if existente is None:
         carrito.append({"producto_id": producto_id, "cantidad": cantidad})
     else:
-        existente["cantidad"] = existente.get("cantidad", 0) + cantidad
+        existente["cantidad"] += cantidad
     request.session["carrito"] = carrito
     messages.success(request, "Producto agregado al carrito.")
     return redirect("catalogo")
@@ -186,7 +226,11 @@ def pedir(request, producto_id):
 @login_required
 def pedidos(request):
     lista, error = [], None
-    carrito = _carrito_resumen(request)
+    carrito = []
+    try:
+        carrito = _carrito_resumen(request)
+    except APIError as e:
+        error = str(e)
     total_carrito = sum(item["subtotal"] for item in carrito)
     try:
         lista = api_client.listar_pedidos(request.session["token"])
@@ -196,17 +240,17 @@ def pedidos(request):
     except APIError as e:
         if e.status == 401:
             return _sesion_expirada(request)
-        error = str(e)
+        error = f"{error} {e}".strip()
     return render(
         request,
         "store/pedidos.html",
         {
             "pedidos": lista,
-            "pedidos_pendientes": [p for p in lista if p["estado"] == "pendiente"],
+            "pedidos_pendientes": [p for p in lista if p.get("estado") == "pendiente"],
             "pedidos_por_enviar": [
-                p for p in lista if p["estado"] in {"pendiente_envio", "pagado"}
+                p for p in lista if p.get("estado") in {"pendiente_envio", "pagado"}
             ],
-            "pedidos_enviados": [p for p in lista if p["estado"] == "enviado"],
+            "pedidos_enviados": [p for p in lista if p.get("estado") == "enviado"],
             "error": error,
             "carrito": carrito,
             "total_carrito": total_carrito,
@@ -303,18 +347,30 @@ def marcar_pedido_enviado(request, pedido_id):
 def panel_admin(request):
     token = request.session["token"]
     if request.method == "POST":
+        nombre = (request.POST.get("nombre") or "").strip()
+        try:
+            precio = float(request.POST.get("precio", ""))
+            stock = int(request.POST.get("stock", ""))
+        except (TypeError, ValueError):
+            messages.error(request, "El precio debe ser numérico y el stock un número entero.")
+            return redirect("panel_admin")
+        if not nombre or precio <= 0 or stock < 0:
+            messages.error(request, "Ingresa un nombre, un precio mayor que cero y un stock no negativo.")
+            return redirect("panel_admin")
         try:
             api_client.crear_producto(token, {
-                "nombre": request.POST["nombre"],
+                "nombre": nombre,
                 "descripcion": request.POST.get("descripcion", ""),
-                "precio": float(request.POST["precio"]),
-                "stock": int(request.POST["stock"]),
+                "precio": precio,
+                "stock": stock,
                 "categoria": request.POST.get("categoria") or "General",
                 "imagen_url": request.POST.get("imagen_url") or None,
             })
         except (ValueError, KeyError):
             messages.error(request, "Revisa precio y stock.")
         except APIError as e:
+            if e.status == 401:
+                return _sesion_expirada(request)
             if e.status == 401:
                 return _sesion_expirada(request)
             messages.error(request, str(e))

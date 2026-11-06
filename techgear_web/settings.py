@@ -49,6 +49,7 @@ if RENDER_HOSTNAME:
     CSRF_TRUSTED_ORIGINS.append(f"https://{RENDER_HOSTNAME}")
 CSRF_TRUSTED_ORIGINS.extend(_csv_env("DJANGO_CSRF_TRUSTED_ORIGINS"))
 CSRF_TRUSTED_ORIGINS = list(dict.fromkeys(CSRF_TRUSTED_ORIGINS))
+CSRF_FAILURE_VIEW = "store.error_views.csrf_failure"
 
 
 # Application definition

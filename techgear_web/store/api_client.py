@@ -12,19 +12,45 @@ def _request(method: str, path: str, token: str | None = None, **kwargs):
     headers = {"Authorization": f"Bearer {token}"} if token else {}
     url = f"{settings.API_URL.rstrip('/')}{path}"
     try:
-        # timeout alto: Render (plan gratis) tarda en despertar
-        r = requests.request(method, url, headers=headers, timeout=60, **kwargs)
-    except requests.RequestException:
-        raise APIError("No se pudo conectar con la API de FastAPI.")
-    if r.status_code >= 400:
+        response = requests.request(method, url, headers=headers, timeout=60, **kwargs)
+    except requests.Timeout as error:
+        raise APIError("La API tardó demasiado en responder. Intenta de nuevo.") from error
+    except requests.ConnectionError as error:
+        raise APIError("No se pudo conectar con la API. Comprueba el servicio e inténtalo de nuevo.") from error
+    except requests.RequestException as error:
+        raise APIError("Ocurrió un problema de comunicación con la API.") from error
+
+    if response.status_code >= 400:
         try:
-            detail = r.json().get("detail")
+            body = response.json()
         except ValueError:
-            detail = None
+            body = {}
+        detail = body.get("detail") if isinstance(body, dict) else None
         if isinstance(detail, list):
-            detail = "; ".join(d.get("msg", "") for d in detail)
-        raise APIError(detail or f"Error {r.status_code}", r.status_code)
-    return None if r.status_code == 204 else r.json()
+            detail = "; ".join(
+                str(item.get("msg", ""))
+                for item in detail
+                if isinstance(item, dict) and item.get("msg")
+            )
+        if response.status_code >= 500:
+            message = "La API tuvo un error interno. Intenta de nuevo más tarde."
+        else:
+            message = detail or {
+                401: "Tu sesión no es válida. Inicia sesión de nuevo.",
+                403: "No tienes permiso para realizar esta acción.",
+                404: "No encontramos el recurso solicitado.",
+                409: "La operación entra en conflicto con el estado actual.",
+                422: "Revisa los datos ingresados e inténtalo de nuevo.",
+                429: "Hay demasiadas solicitudes. Espera un momento e inténtalo de nuevo.",
+            }.get(response.status_code, f"La API respondió con el error {response.status_code}.")
+        raise APIError(str(message), response.status_code)
+
+    if response.status_code == 204:
+        return None
+    try:
+        return response.json()
+    except ValueError as error:
+        raise APIError("La API devolvió una respuesta inválida.") from error
 
 
 def login(email, password):

@@ -1,13 +1,23 @@
 from unittest.mock import Mock, patch
 
+import requests
 from django.conf import settings
-from django.test import SimpleTestCase
+from django.contrib.auth.models import AnonymousUser
+from django.test import RequestFactory, SimpleTestCase
 from django.test import override_settings
 from django.urls import reverse
 
-from store import api_client
+from store import api_client, error_views
+from store.api_client import APIError
+from store.templatetags.store_formatting import cop
 
 
+@override_settings(
+    STORAGES={
+        "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
+        "staticfiles": {"BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage"},
+    }
+)
 class StoreRoutingTests(SimpleTestCase):
     def test_named_routes_resolve_to_expected_paths(self):
         routes = (
@@ -36,6 +46,14 @@ class StoreRoutingTests(SimpleTestCase):
 
         self.assertRedirects(response, reverse("catalogo"), fetch_redirect_response=False)
 
+    @patch("store.views.api_client.login")
+    def test_login_incompleto_muestra_un_error_de_validacion(self, login_mock):
+        response = self.client.post(reverse("login"), {"email": "", "password": ""})
+
+        self.assertEqual(response.status_code, 400)
+        self.assertContains(response, "Ingresa tu correo y contraseña.", status_code=400)
+        login_mock.assert_not_called()
+
 
 @override_settings(
     STORAGES={
@@ -53,6 +71,10 @@ class StoreLandingTests(SimpleTestCase):
         self.assertContains(response, "https://www.instagram.com/techgear.demo/")
         self.assertContains(response, "https://wa.me/573000000000")
         self.assertContains(response, "reemplázalos por los canales oficiales")
+        self.assertContains(response, 'alt="Computador portátil abierto sobre un escritorio de trabajo"')
+        self.assertContains(response, 'alt="Personas colaborando con computadores en un espacio de trabajo"')
+        self.assertContains(response, 'alt="Reloj inteligente de diseño moderno"')
+        self.assertContains(response, "/static/store/img/landing-hero.jpg")
 
 
 @override_settings(
@@ -180,6 +202,33 @@ class StoreProductSpecificationTests(SimpleTestCase):
         self.assertContains(response, "Agotado")
         self.assertContains(response, 'name="cantidad"')
         self.assertContains(response, "disabled aria-describedby")
+
+    @patch(
+        "store.views.api_client.listar_productos",
+        return_value=[
+            {
+                "id": "limited-stock",
+                "nombre": "Producto limitado",
+                "precio": 25000,
+                "stock": 1,
+            }
+        ],
+    )
+    def test_no_agrega_mas_unidades_que_el_stock_disponible(self, _listar_productos):
+        session = self.client.session
+        session["token"] = "test-token"
+        session["usuario"] = {"rol": "cliente"}
+        session.save()
+        self.client.cookies[settings.SESSION_COOKIE_NAME] = session.session_key
+
+        response = self.client.post(
+            reverse("pedir", args=["limited-stock"]),
+            {"cantidad": "2"},
+            follow=True,
+        )
+
+        self.assertContains(response, "Solo hay 1 unidad(es) disponibles")
+        self.assertEqual(self.client.session.get("carrito"), [])
 
     @override_settings(API_URL="https://api.example.test/v1/")
     @patch("store.views.api_client.listar_productos", return_value=[])
@@ -326,3 +375,80 @@ class APIClientRoutingTests(SimpleTestCase):
         )
         for routed_call in request_mock.call_args_list[3:]:
             self.assertEqual(routed_call.kwargs["headers"], {"Authorization": f"Bearer {token}"})
+
+
+class APIClientErrorTests(SimpleTestCase):
+    @patch("store.api_client.requests.request")
+    def test_timeout_se_convierte_en_error_amigable(self, request_mock):
+        request_mock.side_effect = requests.Timeout
+
+        with self.assertRaisesRegex(APIError, "tardó demasiado") as error:
+            api_client.listar_productos()
+
+        self.assertIsNone(error.exception.status)
+
+    @patch("store.api_client.requests.request")
+    def test_error_interno_no_expone_detalles_del_servidor(self, request_mock):
+        response = Mock(status_code=500)
+        response.json.return_value = {"detail": "traceback confidencial"}
+        request_mock.return_value = response
+
+        with self.assertRaisesRegex(APIError, "error interno") as error:
+            api_client.listar_productos()
+
+        self.assertEqual(error.exception.status, 500)
+        self.assertNotIn("traceback", str(error.exception))
+
+    @patch("store.api_client.requests.request")
+    def test_respuesta_json_invalida_se_informa_como_error_de_api(self, request_mock):
+        response = Mock(status_code=200)
+        response.json.side_effect = ValueError
+        request_mock.return_value = response
+
+        with self.assertRaisesRegex(APIError, "respuesta inválida"):
+            api_client.listar_productos()
+
+
+class MoneyFormattingTests(SimpleTestCase):
+    def test_precio_invalido_no_interrumpe_el_renderizado(self):
+        for value in (None, "no es un precio", float("nan"), -1):
+            with self.subTest(value=value):
+                self.assertEqual(cop(value), "Precio no disponible")
+
+    def test_precio_valido_se_muestra_en_pesos_colombianos(self):
+        self.assertEqual(cop("2500000.50"), "$2.500.001")
+
+
+@override_settings(
+    STORAGES={
+        "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
+        "staticfiles": {"BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage"},
+    }
+)
+class ErrorPageTests(SimpleTestCase):
+    def setUp(self):
+        self.factory = RequestFactory()
+
+    def test_paginas_de_error_responden_con_estado_y_texto_correspondientes(self):
+        cases = (
+            (error_views.bad_request, 400, "Solicitud no válida"),
+            (error_views.permission_denied, 403, "Acceso restringido"),
+            (error_views.page_not_found, 404, "No encontramos esta página"),
+            (error_views.server_error, 500, "Tuvimos un problema"),
+        )
+        request = self.factory.get("/")
+        request.session = {}
+        request.user = AnonymousUser()
+        request._messages = []
+
+        for handler, status_code, title in cases:
+            with self.subTest(status=status_code):
+                response = handler(request)
+                self.assertEqual(response.status_code, status_code)
+                self.assertContains(response, title, status_code=status_code)
+
+    def test_ruta_inexistente_usa_la_pagina_404_personalizada(self):
+        response = self.client.get("/ruta-que-no-existe/")
+
+        self.assertEqual(response.status_code, 404)
+        self.assertContains(response, "No encontramos esta página", status_code=404)

@@ -1,0 +1,13 @@
+{% extends "store/base.html" %}
+{% block title %}{{ status_code }} · {{ title }}{% endblock %}
+{% block content %}
+<section class="error-page text-center mx-auto" aria-labelledby="error-title">
+  <p class="eyebrow">TechGear · {{ status_code }}</p>
+  <h1 class="page-title mb-3" id="error-title">{{ title }}</h1>
+  <p class="text-secondary error-message mb-4">{{ message }}</p>
+  <div class="d-flex flex-wrap justify-content-center gap-2">
+    <a class="btn btn-ink rounded-pill px-4" href="{% url 'inicio' %}">Volver al inicio</a>
+    <a class="btn btn-outline-secondary rounded-pill px-4" href="{% url 'catalogo' %}">Ver catálogo</a>
+  </div>
+</section>
+{% endblock %}

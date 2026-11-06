@@ -53,6 +53,12 @@ Los precios se presentan en pesos colombianos (COP).
 - Precios y totales con formato de pesos colombianos y separador de miles.
 - Enlace a la documentación interactiva de la API configurada para la tienda.
 - Interfaz adaptable con modo claro y oscuro.
+- Landing con imágenes optimizadas incluidas en los recursos estáticos del
+  proyecto, para que no dependan de un servicio externo al cargar la página.
+- Manejo de errores de conexión, timeout, respuestas inválidas de la API,
+  errores de validación y solicitudes no autorizadas con mensajes claros.
+- Páginas de error personalizadas para solicitudes incorrectas, acceso
+  restringido, rutas inexistentes y errores internos (400, 403, 404 y 500).
 
 ### 🧑‍💼 Administración
 
@@ -116,7 +122,7 @@ flowchart LR
 ├── techgear_web/
 │   ├── store/
 │   │   ├── migrations/           # Migraciones Django
-│   │   ├── static/store/         # CSS e imágenes de la tienda
+│   │   ├── static/store/         # CSS, imágenes del catálogo y landing
 │   │   ├── templates/store/      # Portada, catálogo, acceso, pedidos y panel
 │   │   ├── templatetags/         # Formato de moneda COP
 │   │   ├── api_client.py         # Cliente HTTP para FastAPI
@@ -350,9 +356,10 @@ La forma más sencilla de explorar todos los esquemas y probar endpoints es
 
 ## 🧪 Pruebas y verificaciones
 
-Las pruebas Django actuales cubren rutas, llamadas a la API, presentación de
-productos agotados, búsqueda, precios colombianos, datos de producto y gestión
-administrativa de pedidos. Para ejecutarlas desde la raíz:
+Las pruebas Django actuales cubren rutas, llamadas y errores de la API,
+presentación de productos agotados, validación de stock al agregar al carrito,
+búsqueda, imágenes de la landing, precios colombianos, páginas de error y
+gestión administrativa de pedidos. Para ejecutarlas desde la raíz:
 
 ```bash
 python techgear_web/manage.py test store
