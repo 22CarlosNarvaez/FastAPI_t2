@@ -5,14 +5,14 @@
 {% block content %}
 <header class="catalog-hero text-center mx-auto mb-5">
   <p class="eyebrow mb-2">Catálogo TechGear</p>
-  <h1 class="page-title mb-3">Encuentra tu próximo favorito.</h1>
-  <p class="text-secondary mb-0">Explora accesorios y dispositivos para acompañarte todos los días.</p>
+  <h1 class="page-title mb-3">Tecnología y accesorios para lo que necesitas.</h1>
+  <p class="text-secondary mb-0">Compara productos y agrégalos al carrito sin crear una cuenta. Iniciar sesión es opcional.</p>
 </header>
 
 <form method="get" action="{% url 'catalogo' %}" class="catalog-search mx-auto mb-5" role="search">
   <label class="visually-hidden" for="catalog-search-input">Buscar productos</label>
   <input id="catalog-search-input" type="search" name="q" value="{{ busqueda }}"
-         class="form-control" placeholder="Buscar por producto, categoría o descripción">
+         class="form-control" placeholder="Busca por nombre, categoría o descripción">
   <button class="btn btn-ink rounded-pill px-4" type="submit">Buscar</button>
   {% if busqueda %}
     <a class="btn btn-outline-secondary rounded-pill px-4" href="{% url 'catalogo' %}">Limpiar</a>
@@ -23,8 +23,8 @@
   <div class="alert alert-warning text-center mx-auto" role="alert" style="max-width: 720px">{{ error }}</div>
 {% elif not productos %}
   <div class="alert alert-light border text-center mx-auto py-4" style="max-width: 720px">
-    {% if busqueda %}No encontramos productos para “{{ busqueda }}”. Prueba con otra búsqueda.
-    {% else %}Pronto encontrarás nuevos productos aquí.{% endif %}
+    {% if busqueda %}No encontramos productos para “{{ busqueda }}”. Prueba con otro nombre o categoría.
+    {% else %}Aún no hay productos disponibles. Vuelve pronto para ver las novedades.{% endif %}
   </div>
 {% elif busqueda %}
   <p class="text-secondary mb-4" role="status">{{ productos|length }} resultado{{ productos|length|pluralize }} para “{{ busqueda }}”.</p>
@@ -42,7 +42,7 @@
       <div class="card-body">
         <span class="badge category-chip rounded-pill mb-3">{{ p.categoria }}</span>
         <h2 class="h5 card-title fw-semibold mb-2">{{ p.nombre }}</h2>
-        <p class="card-text text-secondary small mb-3">{{ p.descripcion|default:"Diseñado para acompañarte todos los días." }}</p>
+        <p class="card-text text-secondary small mb-3">{{ p.descripcion|default:"Consulta sus detalles y elige lo que mejor se adapte a ti." }}</p>
         {% if p.especificaciones %}
           <div class="small mb-3">
             <div class="fw-semibold mb-1">Especificaciones generales</div>
@@ -58,9 +58,7 @@
         </small>
       </div>
       <div class="card-footer bg-white">
-        {% if not request.session.usuario %}
-          <a href="{% url 'login' %}" class="btn btn-outline-secondary rounded-pill w-100">Inicia sesión para pedir</a>
-        {% elif request.session.usuario.rol == "cliente" %}
+        {% if request.session.usuario.rol != "admin" %}
           <form method="post" action="{% url 'pedir' p.id %}" class="d-flex gap-2">
             {% csrf_token %}
             <input type="number" name="cantidad" value="1" min="1" max="{{ p.stock }}"

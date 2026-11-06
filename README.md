@@ -282,21 +282,19 @@ lugar de guardarlas en `.env`. Django no lee automáticamente el archivo
 
 ## 🛍️ Uso de la tienda
 
-1. Crea una cuenta de cliente en `/registro/` e inicia sesión en `/login/`.
-   Las cuentas de cliente son necesarias para agregar productos al carrito y
-   comprar.
-2. Explora `/catalogo/`, selecciona las cantidades disponibles y agrega los
-   productos. Las cantidades se acumulan en el carrito de la sesión; navegar
-   entre páginas no lo vacía mientras la sesión siga activa.
-3. Abre `/pedidos/` para revisar los pedidos y el checkout. Indica dirección,
+1. Explora `/catalogo/`, selecciona las cantidades disponibles y agrega los
+   productos al carrito. No necesitas iniciar sesión ni crear una cuenta para
+   comprar; ambas opciones son voluntarias.
+2. Abre `/pedidos/` para revisar el carrito y finalizar la compra. Indica dirección,
    celular y código postal, y elige tarjeta, Nequi o transferencia para
-   confirmar el pago de demostración.
-4. El inventario se descuenta únicamente cuando el pago se confirma. La API
+   confirmar el pedido de demostración. El carrito se conserva en la sesión
+   mientras sigas usando el mismo navegador.
+3. El inventario se descuenta únicamente cuando el pago se confirma. La API
    vuelve a validar la disponibilidad al procesar el pago y rechaza la
    operación si no hay existencias suficientes.
-5. Consulta el seguimiento del pedido en `/pedidos/`. El cliente puede
-   confirmar su recepción cuando corresponda.
-6. Para administrar la tienda, inicia sesión con la cuenta fija
+4. Consulta el seguimiento de tus pedidos en `/pedidos/`. Puedes iniciar sesión
+   o crear una cuenta si deseas usar también las funciones de cliente.
+5. Para administrar la tienda, inicia sesión con la cuenta fija
    `admin@gmail.com` / `1234567`. Usa `/panel/` para publicar o eliminar
    productos y `/pedidos/` para revisar pedidos por estado y marcarlos como
    enviados.
@@ -326,13 +324,17 @@ OAuth2 de formulario. Las rutas marcadas como protegidas requieren
 | `POST` | `/productos` | Administrador | Crea un producto. |
 | `PUT` | `/productos/{producto_id}` | Administrador | Actualiza un producto. |
 | `DELETE` | `/productos/{producto_id}` | Administrador | Elimina un producto. |
-| `POST` | `/pedidos` | Autenticado | Crea un pedido pendiente y valida la disponibilidad, sin descontar stock. |
-| `GET` | `/pedidos` | Autenticado | Cliente: sus pedidos. Administrador: todos. |
-| `POST` | `/pedidos/{pedido_id}/pagar` | Cliente autenticado | Verifica y descuenta el stock y registra el pago simulado y los datos de entrega. |
+| `POST` | `/pedidos` | Invitado (`X-Guest-ID`) o cliente autenticado | Crea un pedido pendiente y valida la disponibilidad, sin descontar stock. |
+| `GET` | `/pedidos` | Invitado (`X-Guest-ID`) o autenticado | Invitado o cliente: sus pedidos. Administrador: todos. |
+| `POST` | `/pedidos/{pedido_id}/pagar` | Invitado (`X-Guest-ID`) o cliente autenticado | Verifica y descuenta el stock y registra el pago simulado y los datos de entrega. |
 | `PATCH` | `/pedidos/{pedido_id}/enviar` | Administrador | Marca un pedido pagado como enviado. |
-| `PATCH` | `/pedidos/{pedido_id}/recibir` | Cliente autenticado | Confirma la recepción de un pedido propio. |
+| `PATCH` | `/pedidos/{pedido_id}/recibir` | Invitado (`X-Guest-ID`) o cliente autenticado | Confirma la recepción de un pedido propio. |
 
 ### 🔑 Ejemplos rápidos
+
+Las rutas de pedidos para invitados reciben el identificador aleatorio de su
+sesión mediante el encabezado `X-Guest-ID`. La tienda lo conserva en la sesión
+del navegador para mostrar solo los pedidos de esa persona.
 
 Inicio de sesión (el endpoint recibe formulario `username` y `password`):
 

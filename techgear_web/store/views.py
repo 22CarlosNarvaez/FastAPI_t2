@@ -1,4 +1,5 @@
 import re
+import uuid
 
 from django.contrib import messages
 from django.shortcuts import redirect, render
@@ -6,7 +7,7 @@ from django.views.decorators.http import require_http_methods, require_POST
 
 from . import api_client
 from .api_client import APIError
-from .decorators import admin_required, login_required
+from .decorators import admin_required
 
 
 def _get_carrito(request):
@@ -53,6 +54,14 @@ def _carrito_resumen(request):
             "stock": int(producto.get("stock", 0) or 0),
         })
     return productos
+
+
+def _get_guest_id(request):
+    guest_id = request.session.get("guest_id")
+    if not guest_id:
+        guest_id = str(uuid.uuid4())
+        request.session["guest_id"] = guest_id
+    return guest_id
 
 
 def _agregar_especificaciones_genericas(producto):
@@ -177,10 +186,10 @@ def logout_view(request):
     return redirect("catalogo")
 
 
-@login_required
 @require_POST
 def pedir(request, producto_id):
-    if request.session.get("usuario", {}).get("rol") != "cliente":
+    rol = request.session.get("usuario", {}).get("rol")
+    if rol and rol != "cliente":
         messages.error(request, "Solo los clientes pueden agregar productos al carrito.")
         return redirect("catalogo")
     try:
@@ -223,10 +232,10 @@ def pedir(request, producto_id):
     return redirect("catalogo")
 
 
-@login_required
 @require_POST
 def quitar_del_carrito(request, producto_id):
-    if request.session.get("usuario", {}).get("rol") != "cliente":
+    rol = request.session.get("usuario", {}).get("rol")
+    if rol and rol != "cliente":
         messages.error(request, "Solo los clientes pueden modificar el carrito.")
         return redirect("catalogo")
 
@@ -242,7 +251,6 @@ def quitar_del_carrito(request, producto_id):
     return redirect("pedidos")
 
 
-@login_required
 def pedidos(request):
     lista, error = [], None
     carrito = []
@@ -252,12 +260,16 @@ def pedidos(request):
         error = str(e)
     total_carrito = sum(item["subtotal"] for item in carrito)
     try:
-        lista = api_client.listar_pedidos(request.session["token"])
+        token = request.session.get("token")
+        if token:
+            lista = api_client.listar_pedidos(token)
+        else:
+            lista = api_client.listar_pedidos(None, guest_id=_get_guest_id(request))
         for pedido in lista:
             for item in pedido.get("items", []):
                 _agregar_especificaciones_genericas(item)
     except APIError as e:
-        if e.status == 401:
+        if e.status == 401 and request.session.get("token"):
             return _sesion_expirada(request)
         error = f"{error} {e}".strip()
     return render(
@@ -278,16 +290,24 @@ def pedidos(request):
     )
 
 
-@login_required
 @require_POST
 def marcar_pedido_recibido(request, pedido_id):
-    if request.session.get("usuario", {}).get("rol") != "cliente":
+    usuario = request.session.get("usuario", {})
+    if usuario.get("rol") not in (None, "cliente"):
         messages.error(request, "Solo el cliente puede confirmar la recepción.")
         return redirect("pedidos")
     try:
-        api_client.marcar_pedido_recibido(request.session["token"], pedido_id)
+        token = request.session.get("token")
+        if token:
+            api_client.marcar_pedido_recibido(token, pedido_id)
+        else:
+            api_client.marcar_pedido_recibido(
+                None,
+                pedido_id,
+                guest_id=_get_guest_id(request),
+            )
     except APIError as e:
-        if e.status == 401:
+        if e.status == 401 and request.session.get("token"):
             return _sesion_expirada(request)
         messages.error(request, str(e))
     else:
@@ -295,10 +315,10 @@ def marcar_pedido_recibido(request, pedido_id):
     return redirect("pedidos")
 
 
-@login_required
 @require_POST
 def pagar_pedidos(request):
-    if request.session.get("usuario", {}).get("rol") != "cliente":
+    rol = request.session.get("usuario", {}).get("rol")
+    if rol and rol != "cliente":
         messages.error(request, "Solo los clientes pueden pagar pedidos.")
         return redirect("pedidos")
 
@@ -336,25 +356,37 @@ def pagar_pedidos(request):
         return redirect("pedidos")
 
     try:
-        pedido = api_client.crear_pedido(
-            request.session["token"],
-            [
-                {"producto_id": item["producto_id"], "cantidad": item["cantidad"]}
-                for item in productos_seleccionados
-            ],
-        )
-        api_client.pagar_pedido(
-            request.session["token"],
-            pedido["id"],
-            metodo_pago,
-            direccion,
-            telefono,
-            codigo_postal,
-        )
+        token = request.session.get("token")
+        items = [
+            {"producto_id": item["producto_id"], "cantidad": item["cantidad"]}
+            for item in productos_seleccionados
+        ]
+        if token:
+            pedido = api_client.crear_pedido(token, items)
+            api_client.pagar_pedido(
+                token,
+                pedido["id"],
+                metodo_pago,
+                direccion,
+                telefono,
+                codigo_postal,
+            )
+        else:
+            guest_id = _get_guest_id(request)
+            pedido = api_client.crear_pedido(None, items, guest_id=guest_id)
+            api_client.pagar_pedido(
+                None,
+                pedido["id"],
+                metodo_pago,
+                direccion,
+                telefono,
+                codigo_postal,
+                guest_id=guest_id,
+            )
     except ValueError:
         messages.error(request, "Cantidad inválida.")
     except APIError as e:
-        if e.status == 401:
+        if e.status == 401 and token:
             return _sesion_expirada(request)
         messages.error(request, str(e))
     else:

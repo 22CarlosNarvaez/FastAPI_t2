@@ -36,8 +36,8 @@ class ItemPedidoOut(BaseModel):
 
 class PedidoOut(BaseModel):
     id: str
-    usuario_id: str
-    usuario_email: str
+    usuario_id: str | None = None
+    usuario_email: str | None = None
     items: list[ItemPedidoOut]
     total: float
     estado: str

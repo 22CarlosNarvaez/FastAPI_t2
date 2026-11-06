@@ -67,11 +67,11 @@ class StoreLandingTests(SimpleTestCase):
         response = self.client.get(reverse("inicio"))
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "En TechGear acercamos accesorios y dispositivos")
+        self.assertContains(response, "Encuentra tecnología y accesorios para trabajar, estudiar y disfrutar.")
         self.assertContains(response, "https://mail.google.com/mail/?view=cm&amp;fs=1&amp;to=hola.techgear.demo@gmail.com")
         self.assertContains(response, "https://www.instagram.com/techgear.demo/")
         self.assertContains(response, "https://wa.me/573000000000")
-        self.assertContains(response, "reemplázalos por los canales oficiales")
+        self.assertContains(response, "Estos datos son de demostración.")
         self.assertContains(response, 'alt="Computador portátil abierto sobre un escritorio de trabajo"')
         self.assertContains(response, 'alt="Personas colaborando con computadores en un espacio de trabajo"')
         self.assertContains(response, 'alt="Reloj inteligente de diseño moderno"')
@@ -377,7 +377,7 @@ class StoreCartTests(SimpleTestCase):
         self.assertContains(response, 'name="producto_seleccionado"')
         self.assertContains(response, 'value="product-1"')
         self.assertContains(response, 'form="checkout-form" checked')
-        self.assertContains(response, "no se solicitan datos financieros")
+        self.assertContains(response, "Este checkout es de demostración.")
         self.assertNotContains(response, "tarjeta-numero")
         self.assertNotContains(response, "nequi-clave")
 
@@ -412,6 +412,100 @@ class StoreCartTests(SimpleTestCase):
             self.client.session.get("carrito"),
             [{"producto_id": "product-1", "cantidad": 3}],
         )
+
+    @patch(
+        "store.views.api_client.listar_productos",
+        return_value=[
+            {
+                "id": "product-1",
+                "nombre": "Teclado",
+                "precio": 50000,
+                "stock": 4,
+            }
+        ],
+    )
+    def test_invitado_puede_ver_catalogo_y_agregar_al_carrito(self, _listar_productos):
+        session = self.client.session
+        session.pop("token")
+        session.pop("usuario")
+        session["carrito"] = []
+        session.save()
+        self.client.cookies[settings.SESSION_COOKIE_NAME] = session.session_key
+
+        response = self.client.get(reverse("catalogo"))
+
+        self.assertContains(response, "Agregar al carrito")
+        self.assertNotContains(response, "Ingresa para agregar al carrito")
+
+        response = self.client.post(
+            reverse("pedir", args=["product-1"]),
+            {"cantidad": "1"},
+        )
+
+        self.assertRedirects(response, reverse("catalogo"), fetch_redirect_response=False)
+        self.assertEqual(
+            self.client.session.get("carrito"),
+            [{"producto_id": "product-1", "cantidad": 1}],
+        )
+
+    @patch("store.views.api_client.listar_pedidos", return_value=[])
+    @patch("store.views.api_client.listar_productos", return_value=[])
+    def test_invitado_puede_ver_carrito_y_seguimiento_sin_iniciar_sesion(
+        self, _listar_productos, listar_pedidos
+    ):
+        session = self.client.session
+        session.pop("token")
+        session.pop("usuario")
+        session.save()
+        self.client.cookies[settings.SESSION_COOKIE_NAME] = session.session_key
+
+        response = self.client.get(reverse("pedidos"))
+
+        self.assertContains(response, "Puedes comprar como invitado.")
+        self.assertContains(response, "Carrito de compras")
+        self.assertContains(response, "Inicia sesión")
+        guest_id = self.client.session["guest_id"]
+        listar_pedidos.assert_called_once_with(None, guest_id=guest_id)
+
+    @patch("store.views.api_client.pagar_pedido")
+    @patch("store.views.api_client.crear_pedido", return_value={"id": "guest-order-1"})
+    def test_invitado_puede_finalizar_compra_sin_iniciar_sesion(
+        self, crear_pedido, pagar_pedido
+    ):
+        session = self.client.session
+        session.pop("token")
+        session.pop("usuario")
+        session.save()
+        self.client.cookies[settings.SESSION_COOKIE_NAME] = session.session_key
+
+        response = self.client.post(
+            reverse("pagar_pedidos"),
+            {
+                "producto_seleccionado": "product-1",
+                "direccion": "Calle 1 # 2-3",
+                "telefono": "3001234567",
+                "codigo_postal": "050001",
+                "metodo_pago": "nequi",
+            },
+        )
+
+        self.assertRedirects(response, reverse("pedidos"), fetch_redirect_response=False)
+        guest_id = self.client.session["guest_id"]
+        crear_pedido.assert_called_once_with(
+            None,
+            [{"producto_id": "product-1", "cantidad": 2}],
+            guest_id=guest_id,
+        )
+        pagar_pedido.assert_called_once_with(
+            None,
+            "guest-order-1",
+            "nequi",
+            "Calle 1 # 2-3",
+            "3001234567",
+            "050001",
+            guest_id=guest_id,
+        )
+        self.assertEqual(self.client.session.get("carrito"), [])
 
     @patch("store.views.api_client.listar_pedidos", return_value=[
         {
@@ -566,6 +660,22 @@ class APIClientRoutingTests(SimpleTestCase):
         )
         for routed_call in request_mock.call_args_list[3:]:
             self.assertEqual(routed_call.kwargs["headers"], {"Authorization": f"Bearer {token}"})
+
+
+class APIClientGuestRoutingTests(SimpleTestCase):
+    @override_settings(API_URL="https://api.example.test/")
+    @patch("store.api_client.requests.request")
+    def test_guest_id_se_envia_como_header_para_la_api(self, request_mock):
+        response = Mock(status_code=200)
+        response.json.return_value = {"id": "guest-order-1"}
+        request_mock.return_value = response
+
+        api_client.crear_pedido(None, [], guest_id="guest-session-id")
+
+        self.assertEqual(
+            request_mock.call_args.kwargs["headers"],
+            {"X-Guest-ID": "guest-session-id"},
+        )
 
 
 class APIClientErrorTests(SimpleTestCase):

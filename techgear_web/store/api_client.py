@@ -11,6 +11,9 @@ class APIError(Exception):
 def _request(method: str, path: str, token: str | None = None, **kwargs):
     headers = {"Authorization": f"Bearer {token}"} if token else {}
     url = f"{settings.API_URL.rstrip('/')}{path}"
+    guest_id = kwargs.pop("guest_id", None)
+    if guest_id:
+        headers["X-Guest-ID"] = guest_id
     try:
         response = requests.request(method, url, headers=headers, timeout=60, **kwargs)
     except requests.Timeout as error:
@@ -73,19 +76,20 @@ def eliminar_producto(token, producto_id):
     return _request("DELETE", f"/productos/{producto_id}", token)
 
 
-def crear_pedido(token, items):
-    return _request("POST", "/pedidos", token, json={"items": items})
+def crear_pedido(token, items, guest_id=None):
+    return _request("POST", "/pedidos", token, guest_id=guest_id, json={"items": items})
 
 
-def listar_pedidos(token):
-    return _request("GET", "/pedidos", token)
+def listar_pedidos(token, guest_id=None):
+    return _request("GET", "/pedidos", token, guest_id=guest_id)
 
 
-def pagar_pedido(token, pedido_id, metodo_pago, direccion, telefono, codigo_postal):
+def pagar_pedido(token, pedido_id, metodo_pago, direccion, telefono, codigo_postal, guest_id=None):
     return _request(
         "POST",
         f"/pedidos/{pedido_id}/pagar",
         token,
+        guest_id=guest_id,
         json={
             "metodo_pago": metodo_pago,
             "direccion": direccion,
@@ -99,5 +103,5 @@ def marcar_pedido_enviado(token, pedido_id):
     return _request("PATCH", f"/pedidos/{pedido_id}/enviar", token)
 
 
-def marcar_pedido_recibido(token, pedido_id):
-    return _request("PATCH", f"/pedidos/{pedido_id}/recibir", token)
+def marcar_pedido_recibido(token, pedido_id, guest_id=None):
+    return _request("PATCH", f"/pedidos/{pedido_id}/recibir", token, guest_id=guest_id)
