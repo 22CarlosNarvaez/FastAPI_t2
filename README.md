@@ -45,11 +45,12 @@ Los precios se presentan en pesos colombianos (COP).
 - Catálogo en una ruta independiente (`/catalogo/`) con búsqueda por nombre, categoría y descripción.
 - Catálogo de productos con imágenes, categoría, descripción y especificaciones.
 - Registro e inicio de sesión para clientes; el administrador usa una cuenta fija y no requiere registro.
-- Carrito acumulable asociado a la sesión del navegador y disponible al navegar entre secciones mientras la sesión siga activa.
+- Carrito acumulable asociado a la sesión del navegador, con contador Bootstrap, selección de productos para pagar, resumen dinámico, opción para quitar productos y total antes del checkout.
 - Validación de stock al agregar productos y al procesar el pago.
 - Controles para pedir deshabilitados cuando el stock llega a cero.
 - El stock no se descuenta al agregar productos ni al crear un pedido pendiente; se descuenta al confirmar el pago.
 - Seguimiento de pedidos por estado, desde pendientes de pago hasta enviados o recibidos.
+- Seguimiento de pedidos pagados agrupados entre preparación, pendientes por recibir y recibidos.
 - Precios y totales con formato de pesos colombianos y separador de miles.
 - Enlace a la documentación interactiva de la API configurada para la tienda.
 - Interfaz adaptable con modo claro y oscuro.
@@ -72,10 +73,9 @@ credenciales seguras y configurables.
 
 ### 💳 Pagos de demostración
 
-- Selección de tarjeta, Nequi o transferencia.
+- Selección visual de tarjeta, Nequi o transferencia, sin conectar una pasarela ni solicitar credenciales o datos financieros.
 - Captura de dirección, teléfono y código postal de seis dígitos para la entrega.
-- El formulario utiliza valores ficticios: no se realiza un cobro real ni se
-  envían o almacenan datos financieros.
+- La confirmación registra el pedido y su estado de pago de demostración en la API; no se realiza un cobro real ni se envían o almacenan datos financieros.
 - El pedido pasa a preparación de envío después de confirmar el pago simulado.
 
 ## 🧰 Tecnologías

@@ -224,6 +224,25 @@ def pedir(request, producto_id):
 
 
 @login_required
+@require_POST
+def quitar_del_carrito(request, producto_id):
+    if request.session.get("usuario", {}).get("rol") != "cliente":
+        messages.error(request, "Solo los clientes pueden modificar el carrito.")
+        return redirect("catalogo")
+
+    carrito = _get_carrito(request)
+    carrito_actualizado = [
+        item for item in carrito if item["producto_id"] != producto_id
+    ]
+    if len(carrito_actualizado) == len(carrito):
+        messages.error(request, "El producto ya no está en tu carrito.")
+    else:
+        request.session["carrito"] = carrito_actualizado
+        messages.success(request, "Producto eliminado del carrito.")
+    return redirect("pedidos")
+
+
+@login_required
 def pedidos(request):
     lista, error = [], None
     carrito = []
@@ -251,6 +270,7 @@ def pedidos(request):
                 p for p in lista if p.get("estado") in {"pendiente_envio", "pagado"}
             ],
             "pedidos_enviados": [p for p in lista if p.get("estado") == "enviado"],
+            "pedidos_recibidos": [p for p in lista if p.get("estado") == "recibido"],
             "error": error,
             "carrito": carrito,
             "total_carrito": total_carrito,
@@ -287,6 +307,18 @@ def pagar_pedidos(request):
         messages.error(request, "Tu carrito está vacío.")
         return redirect("catalogo")
 
+    ids_seleccionados = set(request.POST.getlist("producto_seleccionado"))
+    productos_carrito = {item["producto_id"] for item in carrito}
+    if not ids_seleccionados:
+        messages.error(request, "Selecciona al menos un producto para pagar.")
+        return redirect("pedidos")
+    if not ids_seleccionados.issubset(productos_carrito):
+        messages.error(request, "La selección contiene productos que no están en tu carrito.")
+        return redirect("pedidos")
+
+    productos_seleccionados = [
+        item for item in carrito if item["producto_id"] in ids_seleccionados
+    ]
     metodo_pago = request.POST.get("metodo_pago", "")
     direccion = request.POST.get("direccion", "").strip()
     telefono = request.POST.get("telefono", "").strip()
@@ -306,7 +338,10 @@ def pagar_pedidos(request):
     try:
         pedido = api_client.crear_pedido(
             request.session["token"],
-            [{"producto_id": item["producto_id"], "cantidad": item["cantidad"]} for item in carrito],
+            [
+                {"producto_id": item["producto_id"], "cantidad": item["cantidad"]}
+                for item in productos_seleccionados
+            ],
         )
         api_client.pagar_pedido(
             request.session["token"],
@@ -323,8 +358,13 @@ def pagar_pedidos(request):
             return _sesion_expirada(request)
         messages.error(request, str(e))
     else:
-        request.session["carrito"] = []
-        messages.success(request, "¡Pedido pagado con éxito! El stock se actualizó al confirmar el pago.")
+        request.session["carrito"] = [
+            item for item in carrito if item["producto_id"] not in ids_seleccionados
+        ]
+        messages.success(
+            request,
+            "Pedido de demostración registrado; los demás productos siguen en tu carrito. No se realizó ningún cobro real.",
+        )
         return redirect("pedidos")
     return redirect("catalogo")
 

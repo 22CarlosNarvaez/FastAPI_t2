@@ -123,7 +123,7 @@ def marcar_recibido(pedido_id: str, usuario: dict) -> dict:
         {
             "_id": to_object_id(pedido_id),
             "usuario_id": str(usuario["_id"]),
-            "estado": {"$in": ["pendiente_envio", "pagado", "enviado"]},
+            "estado": "enviado",
         },
         {"$set": {"estado": "recibido"}},
         return_document=ReturnDocument.AFTER,
@@ -131,6 +131,6 @@ def marcar_recibido(pedido_id: str, usuario: dict) -> dict:
     if pedido is None:
         raise HTTPException(
             status.HTTP_404_NOT_FOUND,
-            "Pedido pagado o enviado no encontrado o no pertenece al cliente",
+            "Pedido enviado no encontrado o no pertenece al cliente",
         )
     return to_out(pedido)

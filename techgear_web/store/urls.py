@@ -10,6 +10,11 @@ urlpatterns = [
     path("logout/", views.logout_view, name="logout"),
     path("pedidos/", views.pedidos, name="pedidos"),
     path("pedidos/pagar/", views.pagar_pedidos, name="pagar_pedidos"),
+    path(
+        "carrito/quitar/<str:producto_id>/",
+        views.quitar_del_carrito,
+        name="quitar_del_carrito",
+    ),
     path("pedidos/<str:pedido_id>/enviar/", views.marcar_pedido_enviado, name="marcar_pedido_enviado"),
     path("pedidos/<str:pedido_id>/recibir/", views.marcar_pedido_recibido, name="marcar_pedido_recibido"),
     path("pedir/<str:producto_id>/", views.pedir, name="pedir"),

@@ -68,7 +68,7 @@
                    {% if p.stock <= 0 %}disabled{% endif %}>
             <button class="btn btn-ink rounded-pill flex-grow-1" type="submit"
                     {% if p.stock <= 0 %}disabled aria-describedby="stock-agotado-{{ p.id }}"{% endif %}>
-              {% if p.stock > 0 %}Agregar pedido{% else %}Agotado{% endif %}
+              {% if p.stock > 0 %}<i class="bi bi-cart-plus me-1" aria-hidden="true"></i>Agregar al carrito{% else %}Agotado{% endif %}
             </button>
           </form>
           {% if p.stock <= 0 %}<span id="stock-agotado-{{ p.id }}" class="visually-hidden">No hay unidades disponibles.</span>{% endif %}

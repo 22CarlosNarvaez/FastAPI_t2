@@ -28,6 +28,7 @@ class StoreRoutingTests(SimpleTestCase):
             ("logout", (), "/logout/"),
             ("pedidos", (), "/pedidos/"),
             ("pagar_pedidos", (), "/pedidos/pagar/"),
+            ("quitar_del_carrito", ("product-1",), "/carrito/quitar/product-1/"),
             ("marcar_pedido_enviado", ("pedido-1",), "/pedidos/pedido-1/enviar/"),
             ("marcar_pedido_recibido", ("pedido-1",), "/pedidos/pedido-1/recibir/"),
             ("pedir", ("producto-1",), "/pedir/producto-1/"),
@@ -237,12 +238,13 @@ class StoreProductSpecificationTests(SimpleTestCase):
 
         self.assertContains(response, 'href="https://api.example.test/v1/docs"')
 
+    @patch("store.views.api_client.listar_productos", return_value=[])
     @patch(
         "store.views.api_client.listar_pedidos",
         return_value=[
             {
                 "id": "order-1",
-                "estado": "pendiente",
+                "estado": "pendiente_envio",
                 "fecha": "2026-11-05",
                 "total": 50000,
                 "items": [
@@ -256,7 +258,7 @@ class StoreProductSpecificationTests(SimpleTestCase):
             }
         ],
     )
-    def test_pedido_muestra_especificaciones_del_producto(self, _listar_pedidos):
+    def test_pedido_muestra_especificaciones_del_producto(self, _listar_pedidos, _productos):
         session = self.client.session
         session["token"] = "test-token"
         session["usuario"] = {"rol": "cliente"}
@@ -332,6 +334,195 @@ class StoreProductSpecificationTests(SimpleTestCase):
         self.assertContains(response, "Enviados")
         self.assertContains(response, "$2.500.000")
         self.assertContains(response, "050001")
+
+
+@override_settings(
+    STORAGES={
+        "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
+        "staticfiles": {"BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage"},
+    }
+)
+class StoreCartTests(SimpleTestCase):
+    def setUp(self):
+        session = self.client.session
+        session["token"] = "test-token"
+        session["usuario"] = {"rol": "cliente"}
+        session["carrito"] = [{"producto_id": "product-1", "cantidad": 2}]
+        session.save()
+        self.client.cookies[settings.SESSION_COOKIE_NAME] = session.session_key
+
+    @patch("store.views.api_client.listar_pedidos", return_value=[])
+    @patch(
+        "store.views.api_client.listar_productos",
+        return_value=[
+            {
+                "id": "product-1",
+                "nombre": "Teclado",
+                "precio": 50000,
+                "stock": 4,
+            }
+        ],
+    )
+    def test_carrito_muestra_resumen_metodos_visuales_y_contador(self, _productos, _pedidos):
+        response = self.client.get(reverse("pedidos"))
+
+        self.assertContains(response, "Carrito de compras")
+        self.assertContains(response, "Teclado")
+        self.assertContains(response, "$100.000")
+        self.assertContains(response, 'aria-label="Carrito de compras, 2 productos"')
+        self.assertContains(response, 'class="bi bi-cart3"')
+        self.assertContains(response, 'name="metodo_pago" value="tarjeta"')
+        self.assertContains(response, 'name="metodo_pago" value="nequi"')
+        self.assertContains(response, 'name="metodo_pago" value="transferencia"')
+        self.assertContains(response, 'name="producto_seleccionado"')
+        self.assertContains(response, 'value="product-1"')
+        self.assertContains(response, 'form="checkout-form" checked')
+        self.assertContains(response, "no se solicitan datos financieros")
+        self.assertNotContains(response, "tarjeta-numero")
+        self.assertNotContains(response, "nequi-clave")
+
+    def test_quitar_producto_remueve_item_del_carrito(self):
+        response = self.client.post(
+            reverse("quitar_del_carrito", args=["product-1"]),
+            follow=True,
+        )
+
+        self.assertContains(response, "Producto eliminado del carrito.")
+        self.assertEqual(self.client.session.get("carrito"), [])
+
+    @patch(
+        "store.views.api_client.listar_productos",
+        return_value=[
+            {
+                "id": "product-1",
+                "nombre": "Teclado",
+                "precio": 50000,
+                "stock": 4,
+            }
+        ],
+    )
+    def test_agregar_producto_acumula_cantidad_en_el_carrito(self, _listar_productos):
+        response = self.client.post(
+            reverse("pedir", args=["product-1"]),
+            {"cantidad": "1"},
+        )
+
+        self.assertRedirects(response, reverse("catalogo"), fetch_redirect_response=False)
+        self.assertEqual(
+            self.client.session.get("carrito"),
+            [{"producto_id": "product-1", "cantidad": 3}],
+        )
+
+    @patch("store.views.api_client.listar_pedidos", return_value=[
+        {
+            "id": "preparing-1",
+            "estado": "pendiente_envio",
+            "items": [{"nombre": "Mouse", "cantidad": 1, "subtotal": 25000}],
+        },
+        {
+            "id": "shipped-1",
+            "estado": "enviado",
+            "items": [{"nombre": "Teclado", "cantidad": 1, "subtotal": 50000}],
+        },
+        {
+            "id": "received-1",
+            "estado": "recibido",
+            "items": [{"nombre": "Audífonos", "cantidad": 1, "subtotal": 75000}],
+        },
+    ])
+    @patch("store.views.api_client.listar_productos", return_value=[])
+    def test_pedidos_separan_en_preparacion_pendientes_y_recibidos(
+        self, _productos, _pedidos
+    ):
+        response = self.client.get(reverse("pedidos"))
+
+        self.assertContains(response, "En preparación")
+        self.assertContains(response, "Pendientes por recibir")
+        self.assertContains(response, "Ya recibidos")
+        self.assertContains(response, "Mouse")
+        self.assertContains(response, "Teclado")
+        self.assertContains(response, "Audífonos")
+        self.assertContains(response, "Confirmar recepción", count=1)
+        self.assertContains(response, "Recepción confirmada")
+
+    @patch("store.views.api_client.pagar_pedido")
+    @patch("store.views.api_client.crear_pedido", return_value={"id": "order-1"})
+    def test_confirmar_checkout_crea_pedido_y_solo_envia_el_metodo_seleccionado(
+        self, crear_pedido, pagar_pedido
+    ):
+        session = self.client.session
+        session["carrito"].append({"producto_id": "product-2", "cantidad": 1})
+        session.save()
+        self.client.cookies[settings.SESSION_COOKIE_NAME] = session.session_key
+        response = self.client.post(
+            reverse("pagar_pedidos"),
+            {
+                "producto_seleccionado": "product-1",
+                "direccion": "Calle 1 # 2-3",
+                "telefono": "3001234567",
+                "codigo_postal": "050001",
+                "metodo_pago": "nequi",
+            },
+        )
+
+        self.assertRedirects(response, reverse("pedidos"), fetch_redirect_response=False)
+        crear_pedido.assert_called_once_with(
+            "test-token",
+            [{"producto_id": "product-1", "cantidad": 2}],
+        )
+        pagar_pedido.assert_called_once_with(
+            "test-token",
+            "order-1",
+            "nequi",
+            "Calle 1 # 2-3",
+            "3001234567",
+            "050001",
+        )
+        self.assertEqual(
+            self.client.session.get("carrito"),
+            [{"producto_id": "product-2", "cantidad": 1}],
+        )
+
+    @patch("store.views.api_client.crear_pedido")
+    def test_checkout_sin_productos_seleccionados_no_crea_pedido(self, crear_pedido):
+        response = self.client.post(
+            reverse("pagar_pedidos"),
+            {
+                "direccion": "Calle 1 # 2-3",
+                "telefono": "3001234567",
+                "codigo_postal": "050001",
+                "metodo_pago": "nequi",
+            },
+            follow=True,
+        )
+
+        self.assertContains(response, "Selecciona al menos un producto para pagar.")
+        crear_pedido.assert_not_called()
+        self.assertEqual(
+            self.client.session.get("carrito"),
+            [{"producto_id": "product-1", "cantidad": 2}],
+        )
+
+    @patch("store.views.api_client.crear_pedido")
+    def test_checkout_rechaza_productos_que_no_pertenecen_al_carrito(self, crear_pedido):
+        response = self.client.post(
+            reverse("pagar_pedidos"),
+            {
+                "producto_seleccionado": "product-outside-cart",
+                "direccion": "Calle 1 # 2-3",
+                "telefono": "3001234567",
+                "codigo_postal": "050001",
+                "metodo_pago": "nequi",
+            },
+            follow=True,
+        )
+
+        self.assertContains(response, "La selección contiene productos que no están en tu carrito.")
+        crear_pedido.assert_not_called()
+        self.assertEqual(
+            self.client.session.get("carrito"),
+            [{"producto_id": "product-1", "cantidad": 2}],
+        )
 
 
 class APIClientRoutingTests(SimpleTestCase):
