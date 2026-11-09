@@ -77,6 +77,14 @@ class StoreLandingTests(SimpleTestCase):
         self.assertContains(response, 'alt="Personas colaborando con computadores en un espacio de trabajo"')
         self.assertContains(response, 'alt="Reloj inteligente de diseño moderno"')
         self.assertContains(response, "/static/store/img/landing-hero.jpg")
+        self.assertContains(response, 'data-bs-target="#site-navigation"')
+        self.assertContains(response, 'aria-controls="site-navigation"')
+        self.assertContains(response, 'class="collapse navbar-collapse" id="site-navigation"')
+        self.assertContains(response, 'href="#main-content">Saltar al contenido</a>')
+        self.assertContains(response, 'id="main-content"')
+        self.assertContains(response, 'name="theme-color" content="#0c0f12"')
+        self.assertContains(response, 'srcset="/static/store/img/landing-hero.webp"')
+        self.assertContains(response, 'width="1400"')
 
     @patch("store.views.api_client.listar_productos", return_value=[])
     def test_paginas_publicas_y_privadas_tienen_directivas_seo_apropiadas(self, _listar_productos):
@@ -89,6 +97,8 @@ class StoreLandingTests(SimpleTestCase):
 
         response = self.client.get(reverse("login"))
         self.assertContains(response, 'name="robots" content="noindex,nofollow"')
+        self.assertContains(response, 'for="login-email"')
+        self.assertContains(response, 'id="login-email"')
 
 
 @override_settings(

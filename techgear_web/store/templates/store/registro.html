@@ -10,20 +10,20 @@
       <p class="text-secondary mb-4">Crea tu cuenta para guardar tu carrito y seguir tus pedidos.</p>
       <form method="post">
         {% csrf_token %}
-        <div class="mb-3"><label class="form-label">Nombre</label>
-          <input name="nombre" class="form-control" required minlength="2"></div>
-        <div class="mb-3"><label class="form-label">Correo</label>
-          <input type="email" name="email" class="form-control" required></div>
-        <div class="mb-3"><label class="form-label">Contraseña (de 6 a 72 caracteres)</label>
-          <input type="password" name="password" class="form-control" required minlength="6" maxlength="72"></div>
-        <div class="mb-3"><label class="form-label">Tipo de usuario</label>
+        <div class="mb-3"><label class="form-label" for="register-name">Nombre</label>
+          <input id="register-name" name="nombre" class="form-control" autocomplete="name" required minlength="2"></div>
+        <div class="mb-3"><label class="form-label" for="register-email">Correo</label>
+          <input id="register-email" type="email" name="email" class="form-control" autocomplete="email" required></div>
+        <div class="mb-3"><label class="form-label" for="register-password">Contraseña (de 6 a 72 caracteres)</label>
+          <input id="register-password" type="password" name="password" class="form-control" autocomplete="new-password" required minlength="6" maxlength="72"></div>
+        <div class="mb-3"><label class="form-label" for="rol">Tipo de usuario</label>
           <select name="rol" id="rol" class="form-select">
             <option value="cliente">Cliente</option>
             <option value="admin">Administrador</option>
           </select></div>
-        <div class="mb-3 d-none" id="codigoBox"><label class="form-label">Código de administrador</label>
-          <input name="codigo_admin" class="form-control"></div>
-        <button class="btn btn-dark w-100">Crear cuenta</button>
+        <div class="mb-3 d-none" id="codigoBox"><label class="form-label" for="admin-code">Código de administrador</label>
+          <input id="admin-code" name="codigo_admin" class="form-control" autocomplete="off"></div>
+        <button class="btn btn-dark w-100" type="submit">Crear cuenta</button>
       </form>
     </div></div>
   </div>

@@ -46,9 +46,11 @@
       <a class="product-card-link" href="{% url 'detalle_producto' p.id %}"
          aria-label="Ver detalles de {{ p.nombre }}">
         {% if p.imagen_url %}
-          <img src="{{ p.imagen_url }}" class="card-img-top product-image" alt="{{ p.nombre }}" loading="lazy">
+          <img src="{{ p.imagen_url }}" class="card-img-top product-image" alt="{{ p.nombre }}"
+               {% if forloop.first %}fetchpriority="high"{% else %}loading="lazy"{% endif %} decoding="async">
         {% else %}
-          <img src="{% static 'store/img/product-placeholder.svg' %}" class="card-img-top product-image" alt="Imagen ilustrativa de {{ p.nombre }}" loading="lazy">
+          <img src="{% static 'store/img/product-placeholder.svg' %}" class="card-img-top product-image" alt="Imagen ilustrativa de {{ p.nombre }}"
+               {% if forloop.first %}fetchpriority="high"{% else %}loading="lazy"{% endif %} decoding="async">
         {% endif %}
         <div class="card-body">
           <span class="badge category-chip rounded-pill mb-3">{{ p.categoria }}</span>

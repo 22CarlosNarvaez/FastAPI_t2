@@ -27,11 +27,16 @@
     </div>
   </div>
   <figure class="landing-image-card mb-0">
-    <img
-      src="{% static 'store/img/landing-hero.jpg' %}"
-      alt="Computador portátil abierto sobre un escritorio de trabajo"
-      fetchpriority="high"
-      decoding="async">
+    <picture>
+      <source srcset="{% static 'store/img/landing-hero.webp' %}" type="image/webp">
+      <img
+        src="{% static 'store/img/landing-hero.jpg' %}"
+        width="1400"
+        height="933"
+        alt="Computador portátil abierto sobre un escritorio de trabajo"
+        fetchpriority="high"
+        decoding="async">
+    </picture>
     <figcaption class="landing-image-caption">
       <span class="eyebrow mb-1">Tu espacio, mejor equipado</span>
       <strong>Ideas y tecnología para todos los días.</strong>
@@ -50,21 +55,31 @@
   <div class="row g-3">
     <div class="col-12 col-md-7">
       <figure class="landing-gallery-card mb-0">
-        <img
-          src="{% static 'store/img/landing-workspace.jpg' %}"
-          alt="Personas colaborando con computadores en un espacio de trabajo"
-          loading="lazy"
-          decoding="async">
+        <picture>
+          <source srcset="{% static 'store/img/landing-workspace.webp' %}" type="image/webp">
+          <img
+            src="{% static 'store/img/landing-workspace.jpg' %}"
+            width="1000"
+            height="667"
+            alt="Personas colaborando con computadores en un espacio de trabajo"
+            loading="lazy"
+            decoding="async">
+        </picture>
         <figcaption>Todo listo para trabajar y crear.</figcaption>
       </figure>
     </div>
     <div class="col-12 col-md-5">
       <figure class="landing-gallery-card mb-0">
-        <img
-          src="{% static 'store/img/landing-wearable.jpg' %}"
-          alt="Reloj inteligente de diseño moderno"
-          loading="lazy"
-          decoding="async">
+        <picture>
+          <source srcset="{% static 'store/img/landing-wearable.webp' %}" type="image/webp">
+          <img
+            src="{% static 'store/img/landing-wearable.jpg' %}"
+            width="800"
+            height="581"
+            alt="Reloj inteligente de diseño moderno"
+            loading="lazy"
+            decoding="async">
+        </picture>
         <figcaption>Accesorios que simplifican tu día.</figcaption>
       </figure>
     </div>
