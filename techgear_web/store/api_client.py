@@ -68,6 +68,10 @@ def listar_productos():
     return _request("GET", "/productos")
 
 
+def obtener_producto(producto_id):
+    return _request("GET", f"/productos/{producto_id}")
+
+
 def crear_producto(token, payload):
     return _request("POST", "/productos", token, json=payload)
 

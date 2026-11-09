@@ -1,5 +1,6 @@
 {% extends "store/base.html" %}
 {% block title %}{{ status_code }} · {{ title }}{% endblock %}
+{% block robots %}noindex,nofollow{% endblock %}
 {% block content %}
 <section class="error-page text-center mx-auto" aria-labelledby="error-title">
   <p class="eyebrow">TechGear · {{ status_code }}</p>

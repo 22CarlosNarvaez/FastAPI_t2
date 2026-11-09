@@ -23,6 +23,7 @@ class StoreRoutingTests(SimpleTestCase):
         routes = (
             ("inicio", (), "/"),
             ("catalogo", (), "/catalogo/"),
+            ("detalle_producto", ("product-1",), "/productos/product-1/"),
             ("login", (), "/login/"),
             ("registro", (), "/registro/"),
             ("logout", (), "/logout/"),
@@ -76,6 +77,18 @@ class StoreLandingTests(SimpleTestCase):
         self.assertContains(response, 'alt="Personas colaborando con computadores en un espacio de trabajo"')
         self.assertContains(response, 'alt="Reloj inteligente de diseño moderno"')
         self.assertContains(response, "/static/store/img/landing-hero.jpg")
+
+    @patch("store.views.api_client.listar_productos", return_value=[])
+    def test_paginas_publicas_y_privadas_tienen_directivas_seo_apropiadas(self, _listar_productos):
+        response = self.client.get(reverse("inicio"))
+        self.assertContains(response, 'name="robots" content="index,follow"')
+        self.assertContains(response, 'rel="canonical" href="http://testserver/"')
+
+        response = self.client.get(reverse("catalogo"))
+        self.assertContains(response, 'rel="canonical" href="http://testserver/catalogo/"')
+
+        response = self.client.get(reverse("login"))
+        self.assertContains(response, 'name="robots" content="noindex,nofollow"')
 
 
 @override_settings(
@@ -619,6 +632,66 @@ class StoreCartTests(SimpleTestCase):
         )
 
 
+@override_settings(
+    STORAGES={
+        "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
+        "staticfiles": {"BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage"},
+    }
+)
+class StoreProductDetailTests(SimpleTestCase):
+    @patch(
+        "store.views.api_client.obtener_producto",
+        return_value={
+            "id": "laptop-1",
+            "nombre": "Portátil Lenovo",
+            "categoria": "Computadores",
+            "descripcion": "Equipo para trabajar y estudiar.",
+            "precio": 2500000,
+            "stock": 1,
+            "imagen_url": "https://images.example.test/laptop.jpg",
+        },
+    )
+    def test_detalle_muestra_imagen_info_compra_y_datos_seo(self, _obtener_producto):
+        response = self.client.get(reverse("detalle_producto", args=["laptop-1"]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'class="product-detail"')
+        self.assertContains(response, 'src="https://images.example.test/laptop.jpg"')
+        self.assertContains(response, "Portátil Lenovo")
+        self.assertContains(response, "$2.500.000")
+        self.assertContains(response, 'rel="canonical" href="http://testserver/productos/laptop-1/"')
+        self.assertContains(response, 'property="og:image" content="https://images.example.test/laptop.jpg"')
+        self.assertContains(response, 'type="application/ld+json"')
+        self.assertContains(response, '"priceCurrency": "COP"')
+
+    @patch(
+        "store.views.api_client.listar_productos",
+        return_value=[
+            {
+                "id": "product-1",
+                "nombre": "Producto de prueba",
+                "categoria": "General",
+                "precio": 1000,
+                "stock": 1,
+            }
+        ],
+    )
+    def test_catalogo_enlaza_el_producto_a_su_ficha(self, _listar_productos):
+        response = self.client.get(reverse("catalogo"))
+
+        self.assertContains(response, 'href="/productos/product-1/"')
+        self.assertContains(response, "Ver detalles")
+
+    @patch(
+        "store.views.api_client.obtener_producto",
+        side_effect=APIError("No encontramos el recurso solicitado.", status=404),
+    )
+    def test_detalle_de_producto_inexistente_devuelve_404(self, _obtener_producto):
+        response = self.client.get(reverse("detalle_producto", args=["missing-product"]))
+
+        self.assertEqual(response.status_code, 404)
+
+
 class APIClientRoutingTests(SimpleTestCase):
     @override_settings(API_URL="https://api.example.test/")
     @patch("store.api_client.requests.request")
@@ -631,6 +704,7 @@ class APIClientRoutingTests(SimpleTestCase):
         api_client.login("user@example.test", "password")
         api_client.registrar({"nombre": "Test"})
         api_client.listar_productos()
+        api_client.obtener_producto("product-1")
         api_client.crear_producto(token, {})
         api_client.eliminar_producto(token, "product-1")
         api_client.crear_pedido(token, [])
@@ -649,6 +723,7 @@ class APIClientRoutingTests(SimpleTestCase):
                 ("POST", "/auth/login"),
                 ("POST", "/usuarios/registro"),
                 ("GET", "/productos"),
+                ("GET", "/productos/product-1"),
                 ("POST", "/productos"),
                 ("DELETE", "/productos/product-1"),
                 ("POST", "/pedidos"),
@@ -658,7 +733,7 @@ class APIClientRoutingTests(SimpleTestCase):
                 ("PATCH", "/pedidos/order-1/recibir"),
             ],
         )
-        for routed_call in request_mock.call_args_list[3:]:
+        for routed_call in request_mock.call_args_list[4:]:
             self.assertEqual(routed_call.kwargs["headers"], {"Authorization": f"Bearer {token}"})
 
 

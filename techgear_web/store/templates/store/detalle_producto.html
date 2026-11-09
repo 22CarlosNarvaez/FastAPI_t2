@@ -1,0 +1,72 @@
+{% extends "store/base.html" %}
+{% load store_formatting %}
+{% block title %}{{ producto.nombre }}{% endblock %}
+{% block meta_description %}{{ seo_description }}{% endblock %}
+{% block seo_head %}
+  <link rel="canonical" href="{{ canonical_url }}">
+  <meta property="og:type" content="product">
+  <meta property="og:title" content="{{ producto.nombre }} | TechGear">
+  <meta property="og:description" content="{{ seo_description }}">
+  <meta property="og:url" content="{{ canonical_url }}">
+  <meta property="og:image" content="{{ image_url }}">
+  <meta name="twitter:card" content="summary_large_image">
+  <script type="application/ld+json">{{ product_json_ld }}</script>
+{% endblock %}
+{% block content %}
+<nav aria-label="Ruta de navegación" class="mb-4">
+  <ol class="breadcrumb">
+    <li class="breadcrumb-item"><a href="{% url 'inicio' %}">Inicio</a></li>
+    <li class="breadcrumb-item"><a href="{% url 'catalogo' %}">Catálogo</a></li>
+    <li class="breadcrumb-item active" aria-current="page">{{ producto.nombre }}</li>
+  </ol>
+</nav>
+
+<article class="product-detail" itemscope itemtype="https://schema.org/Product">
+  <figure class="product-detail-media mb-0">
+    <img src="{{ image_url }}"
+         alt="{{ producto.nombre }}" itemprop="image" fetchpriority="high" decoding="async">
+  </figure>
+
+  <section class="product-detail-content" aria-labelledby="product-title">
+    <p class="eyebrow">{{ producto.categoria|default:"General" }}</p>
+    <h1 class="page-title product-detail-title" id="product-title" itemprop="name">{{ producto.nombre }}</h1>
+    <p class="product-detail-price fs-2 fw-semibold" itemprop="offers" itemscope itemtype="https://schema.org/Offer">
+      <span itemprop="price" content="{{ producto.precio }}">{{ producto.precio|cop }}</span>
+      <meta itemprop="priceCurrency" content="COP">
+    </p>
+    <p class="text-secondary product-detail-description" itemprop="description">
+      {{ producto.descripcion|default:"Consulta sus detalles y disponibilidad antes de elegir." }}
+    </p>
+
+    {% if producto.especificaciones %}
+      <section class="product-specifications" aria-labelledby="specifications-title">
+        <h2 class="h5" id="specifications-title">Especificaciones generales</h2>
+        <ul class="text-secondary">
+          {% for especificacion in producto.especificaciones %}
+            <li>{{ especificacion }}</li>
+          {% endfor %}
+        </ul>
+      </section>
+    {% endif %}
+
+    <p class="product-detail-stock">
+      <span class="stock-dot {% if producto.stock <= 0 %}out{% endif %}" aria-hidden="true"></span>
+      {% if producto.stock > 0 %}Disponible · {{ producto.stock }} en stock{% else %}Agotado{% endif %}
+    </p>
+
+    {% if request.session.usuario.rol != "admin" %}
+      <form method="post" action="{% url 'pedir' producto.id %}" class="product-detail-actions">
+        {% csrf_token %}
+        <label class="visually-hidden" for="product-quantity">Cantidad</label>
+        <input id="product-quantity" type="number" name="cantidad" value="1" min="1"
+               max="{{ producto.stock }}" class="form-control" {% if producto.stock <= 0 %}disabled{% endif %}>
+        <button class="btn btn-ink rounded-pill px-4" type="submit"
+                {% if producto.stock <= 0 %}disabled{% endif %}>
+          {% if producto.stock > 0 %}<i class="bi bi-cart-plus me-1" aria-hidden="true"></i>Agregar al carrito{% else %}Agotado{% endif %}
+        </button>
+      </form>
+    {% endif %}
+    <a class="link-secondary d-inline-block mt-4" href="{% url 'catalogo' %}">Volver al catálogo</a>
+  </section>
+</article>
+{% endblock %}

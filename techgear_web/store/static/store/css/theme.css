@@ -249,6 +249,50 @@ h1, h2, h3, h4, h5, h6 { color: var(--tg-text); letter-spacing: -.035em; }
   background: #252c32;
   border-bottom: 1px solid #414a53;
 }
+.product-title-link { color: inherit; text-decoration: none; }
+.product-title-link:hover, .product-title-link:focus-visible { color: var(--tg-accent); }
+.product-detail {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  align-items: start;
+  gap: clamp(1.5rem, 5vw, 4rem);
+  max-width: 1080px;
+  margin-inline: auto;
+}
+.product-detail-media {
+  position: sticky;
+  top: 6rem;
+  overflow: hidden;
+  border: 1px solid var(--tg-line);
+  border-radius: 22px;
+  background: var(--tg-surface);
+}
+.product-detail-media img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  object-fit: contain;
+  background: var(--tg-surface-raised);
+}
+.product-detail-content { min-width: 0; padding-block: .75rem; }
+.product-detail-title {
+  margin-bottom: 1.25rem;
+  overflow-wrap: anywhere;
+  font-size: clamp(2rem, 4vw, 3.25rem);
+}
+.product-detail-price { color: var(--tg-text); }
+.product-detail-description { font-size: 1.05rem; line-height: 1.8; }
+.product-specifications {
+  margin-block: 1.75rem;
+  padding: 1.25rem;
+  border: 1px solid var(--tg-line);
+  border-radius: 16px;
+  background: var(--tg-surface);
+}
+.product-specifications ul { margin-bottom: 0; padding-left: 1.2rem; line-height: 1.8; }
+.product-detail-stock { display: flex; align-items: center; gap: .55rem; }
+.product-detail-actions { display: flex; flex-wrap: wrap; gap: .75rem; margin-top: 1.25rem; }
+.product-detail-actions .form-control { max-width: 100px; }
 .category-chip {
   border: 1px solid #596b3c;
   background: #303a28;
@@ -513,6 +557,11 @@ html[data-theme="dark"] .admin-orders-empty-icon { color: var(--tg-accent); }
   .nav-actions { width: 100%; justify-content: flex-start !important; }
   main.page-shell { padding-top: 2rem !important; padding-bottom: 2rem !important; }
   .product-image { height: 210px; }
+  .product-detail { grid-template-columns: minmax(0, 1fr); gap: 1.5rem; }
+  .product-detail-media { position: static; }
+  .product-detail-media img { aspect-ratio: 4 / 3; }
+  .product-detail-content { padding-block: 0; }
+  .product-detail-actions > .btn { flex: 1; }
   .catalog-hero { padding-inline: .25rem; }
   .catalog-hero .page-title { font-size: clamp(2.2rem, 12vw, 3.2rem); }
   .site-footer .container { justify-content: center !important; padding-block: 1.1rem; text-align: center; }

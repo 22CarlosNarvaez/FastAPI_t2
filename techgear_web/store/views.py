@@ -1,8 +1,12 @@
+import json
 import re
 import uuid
 
 from django.contrib import messages
+from django.http import Http404
 from django.shortcuts import redirect, render
+from django.templatetags.static import static
+from django.utils.safestring import mark_safe
 from django.views.decorators.http import require_http_methods, require_POST
 
 from . import api_client
@@ -122,6 +126,69 @@ def catalogo(request):
         request,
         "store/catalogo.html",
         {"productos": productos, "error": error, "busqueda": busqueda},
+    )
+
+
+def detalle_producto(request, producto_id):
+    try:
+        producto = _agregar_especificaciones_genericas(
+            api_client.obtener_producto(producto_id)
+        )
+    except APIError as error:
+        if error.status == 404:
+            raise Http404("Producto no encontrado") from error
+        return render(
+            request,
+            "store/error.html",
+            {
+                "status_code": 502,
+                "title": "No pudimos cargar el producto",
+                "message": str(error),
+            },
+            status=502,
+        )
+
+    image_path = producto.get("imagen_url") or static("store/img/product-placeholder.svg")
+    image_url = request.build_absolute_uri(image_path)
+    canonical_url = request.build_absolute_uri(request.path)
+    description = producto.get("descripcion") or (
+        f"Conoce los detalles, disponibilidad y precio de {producto['nombre']} en TechGear."
+    )
+    structured_data = {
+        "@context": "https://schema.org",
+        "@type": "Product",
+        "name": producto["nombre"],
+        "description": description,
+        "image": image_url,
+        "category": producto.get("categoria", "General"),
+        "offers": {
+            "@type": "Offer",
+            "url": canonical_url,
+            "priceCurrency": "COP",
+            "price": producto["precio"],
+            "availability": (
+                "https://schema.org/InStock"
+                if producto.get("stock", 0) > 0
+                else "https://schema.org/OutOfStock"
+            ),
+        },
+    }
+    product_json_ld = mark_safe(
+        json.dumps(structured_data, ensure_ascii=False)
+        .replace("&", "\\u0026")
+        .replace("<", "\\u003c")
+        .replace(">", "\\u003e")
+    )
+    return render(
+        request,
+        "store/detalle_producto.html",
+        {
+            "producto": producto,
+            "image_url": image_url,
+            "canonical_url": canonical_url,
+            "seo_description": description[:160],
+            "product_json_ld": product_json_ld,
+        },
     )
 
 

@@ -1,6 +1,16 @@
 {% extends "store/base.html" %}
 {% load static %}
 {% block title %}Inicio{% endblock %}
+{% block meta_description %}Descubre tecnología y accesorios en TechGear. Encuentra productos para trabajar, estudiar y disfrutar, con precios y disponibilidad claros.{% endblock %}
+{% block seo_head %}
+  <link rel="canonical" href="{{ request.build_absolute_uri }}">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="TechGear | Tecnología para tu día a día">
+  <meta property="og:description" content="Descubre tecnología y accesorios en TechGear para trabajar, estudiar y disfrutar.">
+  <meta property="og:url" content="{{ request.build_absolute_uri }}">
+  <meta property="og:image" content="{{ request.scheme }}://{{ request.get_host }}{% static 'store/img/landing-hero.jpg' %}">
+  <meta name="twitter:card" content="summary_large_image">
+{% endblock %}
 {% block content %}
 <section class="landing-hero">
   <div class="landing-copy">
@@ -104,4 +114,4 @@
     </div>
   </div>
  </section>
-{% endblock %}
+{% endblock %}-0

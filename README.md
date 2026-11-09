@@ -44,6 +44,8 @@ Los precios se presentan en pesos colombianos (COP).
 - Portada informativa con descripción de TechGear y enlaces de contacto de demostración.
 - Catálogo en una ruta independiente (`/catalogo/`) con búsqueda por nombre, categoría y descripción.
 - Catálogo de productos con imágenes, categoría, descripción y especificaciones.
+- Ficha individual de producto (`/productos/<id>/`) con imagen junto a sus detalles, estado de stock y acceso al carrito.
+- Metadatos de producto, URL canónica y datos estructurados Schema.org para mejorar su presentación en buscadores.
 - Registro e inicio de sesión para clientes; el administrador usa una cuenta fija y no requiere registro.
 - Carrito acumulable asociado a la sesión del navegador, con contador Bootstrap, selección de productos para pagar, resumen dinámico, opción para quitar productos y total antes del checkout.
 - Validación de stock al agregar productos y al procesar el pago.

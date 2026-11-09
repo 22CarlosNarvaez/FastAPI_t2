@@ -2,6 +2,15 @@
 {% load static %}
 {% load store_formatting %}
 {% block title %}Catálogo{% endblock %}
+{% block meta_description %}Explora el catálogo de TechGear: compara productos tecnológicos, consulta precios y disponibilidad, y encuentra accesorios para tu día a día.{% endblock %}
+{% block seo_head %}
+  <link rel="canonical" href="{{ request.scheme }}://{{ request.get_host }}{% url 'catalogo' %}">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Catálogo de tecnología | TechGear">
+  <meta property="og:description" content="Compara productos tecnológicos, precios y disponibilidad en el catálogo de TechGear.">
+  <meta property="og:url" content="{{ request.scheme }}://{{ request.get_host }}{% url 'catalogo' %}">
+  <meta name="twitter:card" content="summary">
+{% endblock %}
 {% block content %}
 <header class="catalog-hero text-center mx-auto mb-5">
   <p class="eyebrow mb-2">Catálogo TechGear</p>
@@ -41,7 +50,9 @@
       {% endif %}
       <div class="card-body">
         <span class="badge category-chip rounded-pill mb-3">{{ p.categoria }}</span>
-        <h2 class="h5 card-title fw-semibold mb-2">{{ p.nombre }}</h2>
+        <h2 class="h5 card-title fw-semibold mb-2">
+          <a class="product-title-link" href="{% url 'detalle_producto' p.id %}">{{ p.nombre }}</a>
+        </h2>
         <p class="card-text text-secondary small mb-3">{{ p.descripcion|default:"Consulta sus detalles y elige lo que mejor se adapte a ti." }}</p>
         {% if p.especificaciones %}
           <div class="small mb-3">
@@ -52,6 +63,10 @@
           </div>
         {% endif %}
         <p class="fs-4 fw-semibold mb-2">{{ p.precio|cop }}</p>
+        <a class="btn btn-outline-secondary btn-sm rounded-pill mb-3"
+           href="{% url 'detalle_producto' p.id %}" aria-label="Ver detalles de {{ p.nombre }}">
+          Ver detalles
+        </a>
         <small class="text-secondary">
           <span class="stock-dot {% if p.stock <= 0 %}out{% endif %}"></span>
           {% if p.stock > 0 %}Disponible · {{ p.stock }} en stock{% else %}Agotado{% endif %}

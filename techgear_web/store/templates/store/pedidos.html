@@ -1,6 +1,7 @@
 {% extends "store/base.html" %}
 {% load store_formatting %}
 {% block title %}Carrito y pedidos{% endblock %}
+{% block robots %}noindex,nofollow{% endblock %}
 {% block content %}
 <div class="mb-4">
   <div class="eyebrow">{% if request.session.usuario.rol == "admin" %}Tu cuenta{% else %}Tu compra{% endif %}</div>
