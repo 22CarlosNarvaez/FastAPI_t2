@@ -249,8 +249,17 @@ h1, h2, h3, h4, h5, h6 { color: var(--tg-text); letter-spacing: -.035em; }
   background: #252c32;
   border-bottom: 1px solid #414a53;
 }
-.product-title-link { color: inherit; text-decoration: none; }
-.product-title-link:hover, .product-title-link:focus-visible { color: var(--tg-accent); }
+.product-card-link {
+  display: block;
+  color: inherit;
+  text-decoration: none;
+}
+.product-card-link:hover .card-title,
+.product-card-link:focus-visible .card-title { color: var(--tg-accent); }
+.product-card-link:focus-visible {
+  outline: 3px solid var(--tg-accent);
+  outline-offset: -3px;
+}
 .product-detail {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);

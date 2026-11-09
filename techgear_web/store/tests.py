@@ -679,8 +679,8 @@ class StoreProductDetailTests(SimpleTestCase):
     def test_catalogo_enlaza_el_producto_a_su_ficha(self, _listar_productos):
         response = self.client.get(reverse("catalogo"))
 
-        self.assertContains(response, 'href="/productos/product-1/"')
-        self.assertContains(response, "Ver detalles")
+        self.assertContains(response, 'class="product-card-link" href="/productos/product-1/"')
+        self.assertNotContains(response, "btn-outline-secondary btn-sm rounded-pill mb-3")
 
     @patch(
         "store.views.api_client.obtener_producto",
